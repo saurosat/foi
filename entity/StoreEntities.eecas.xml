@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<eecas xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/entity-eca-3.xsd">
+    <eeca entity="mantle.product.store.ProductStore" id="StoreUpdateSubscription"
+          get-entire-entity="false" run-on-error="false"
+          on-create="true" on-update="true" on-delete="true">
+        <actions>
+            <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic"  in-map="context" out-map="context" />
+        </actions>
+    </eeca>
+    <eeca entity="mantle.product.Product" id="ProductUpdate"
+          get-entire-entity="false" run-on-error="false"
+          on-create="true" on-update="true" on-delete="true">
+        <actions>
+            <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic"  in-map="context" out-map="context"/>
+        </actions>
+    </eeca>
+    <eeca entity="mantle.product.category.ProductCategory" id="CategoryUpdate"
+          get-entire-entity="false" run-on-error="false"
+          on-create="true" on-update="true" on-delete="true">
+        <actions>
+            <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic"  in-map="context" out-map="context"/>
+        </actions>
+    </eeca>
+    <eeca entity="mantle.product.category.ProductCategoryMember" id="PCMUpdate"
+          get-entire-entity="false" run-on-error="false"
+          on-create="true" on-update="true" on-delete="true">
+        <actions>
+            <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic"  in-map="context" out-map="context"/>
+        </actions>
+    </eeca>
+    <eeca entity="mantle.product.store.ProductStorePromotion" id="PSPUpdate"
+          get-entire-entity="false" run-on-error="false"
+          on-create="true" on-update="true" on-delete="true">
+        <actions>
+            <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic"  in-map="context" out-map="context"/>
+        </actions>
+    </eeca>
+</eecas>

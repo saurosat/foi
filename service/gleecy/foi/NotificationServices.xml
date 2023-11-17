@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="publish" noun="EntityTopic">
+        <in-parameters>
+            <parameter name="entityValue" required="true" type = "org.moqui.entity.EntityValue"/>
+            <parameter name="eecaOperation" type="String"/>
+        </in-parameters>
+        <actions>
+            <script>
+                import io.gleecy.foi.HttpTopic
+                HttpTopic topic = ec.getTool("HttpTopic", HttpTopic.class, entityValue, eecaOperation)
+                if(topic != null) {
+                    topic.send()
+                }
+            </script>
+        </actions>
+    </service>
+</services>
