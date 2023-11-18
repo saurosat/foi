@@ -4,11 +4,15 @@ import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.api.Result;
 import org.moqui.entity.EntityValue;
+import org.moqui.impl.entity.EntityDefinition;
+import org.moqui.impl.entity.EntityValueBase;
+import org.moqui.impl.entity.FieldInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 
 public class EntityTopic implements HttpTopic {
@@ -65,8 +69,19 @@ public class EntityTopic implements HttpTopic {
     public void send() {
         if (ev == null || ev.isEmpty())
             return;
-        Map<String, Object> vMap = ev.getMap();
-        if (vMap == null || vMap.isEmpty())
+        EntityValueBase entity = ((EntityValueBase) ev);
+        EntityDefinition ed = entity.getEntityDefinition();
+        FieldInfo[] fieldInfos = ed.entityInfo.allFieldInfoArray;
+
+        Map<String, Object> vMap = new HashMap<>();
+        int numFields = fieldInfos.length;
+        for (int i = 0; i < numFields; i++) {
+            FieldInfo fieldInfo = fieldInfos[i];
+            Object fieldValue = entity.getKnownField(fieldInfo);
+            if(fieldValue != null)
+                vMap.put(fieldInfo.name, fieldInfo.convertToString(fieldValue));
+        }
+        if (vMap.isEmpty())
             return;
 
         if (!startIfNeeded())
@@ -77,7 +92,7 @@ public class EntityTopic implements HttpTopic {
                 if (entry.getKey() == null)
                     continue;
                 request.param(entry.getKey(),
-                        entry.getValue() == null ? "" : entry.getValue().toString());
+                        entry.getValue() == null ? "" :  entry.getValue().toString());
             }
             if (params != null) {
                 for (Map.Entry<String, String> paramEntry : params.entrySet()) {
