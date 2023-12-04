@@ -187,7 +187,7 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
 
         if(isSubscriberChanged) {
             if(publisher == null) { //The input store has not ever subscribed before
-                publisher = initInstance(ev);
+                publisher = initInstance(ev); //already putSubscriber
             } else {
                 publisher.putSubscriber(ev);
             }
@@ -200,7 +200,7 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
             return null;
         }
 
-        return publisher.newTopic(ev, Map.of("on", on, "entityName", ev.getEntityNamePretty()));
+        return publisher.newTopic(ev, Map.of("on", on));
     }
 
     /**

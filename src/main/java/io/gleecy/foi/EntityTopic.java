@@ -88,6 +88,7 @@ public class EntityTopic implements HttpTopic {
             return;
         for (URI uri: uris) {
             Request request = httpClient.POST(uri).accept("text/html");
+            request.param("entityName", ed.getEntityName());
             for (Map.Entry<String, Object> entry : vMap.entrySet()) {
                 if (entry.getKey() == null)
                     continue;
