@@ -16,4 +16,22 @@
             </script>
         </actions>
     </service>
+    <service verb="update" noun="StoreInfo">
+        <in-parameters>
+            <parameter name="productStoreId" required="true" type="String" />
+            <parameter name="entityValue" required="true" type = "org.moqui.entity.EntityValue"/>
+            <parameter name="eecaOperation" type="String"/>
+        </in-parameters>
+        <actions>
+            <script>
+                import io.gleecy.foi.StoreInfo
+
+                StoreInfo store = ec.getTool("StoreInfo", StoreInfo.class, productStoreId)
+                System.out.println("update#StoreInfo: ProductStoreId = " + (productStoreId == null ? "NULL" : productStoreId))
+                if (store != null) {
+                    store.update(entityValue, eecaOperation)
+                }
+            </script>
+        </actions>
+    </service>
 </services>

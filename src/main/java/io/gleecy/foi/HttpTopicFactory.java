@@ -12,15 +12,12 @@ import org.eclipse.jetty.util.Pool;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.moqui.context.ExecutionContextFactory;
 import org.moqui.context.ToolFactory;
-import org.moqui.entity.EntityCondition;
-import org.moqui.entity.EntityFind;
-import org.moqui.entity.EntityList;
 import org.moqui.entity.EntityValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.eclipse.jetty.http2.client.http.ClientConnectionFactoryOverHTTP2;
 
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class HttpTopicFactory implements ToolFactory<HttpTopic> {
@@ -28,8 +25,7 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
     private static final String STORE_ENTITY_NAME = "mantle.product.store.ProductStore";
 
     private HttpClient httpClient = null;
-    private Map<String, HttpPublisher> publisherMap = new HashMap<>();
-    private HttpPublisher publicPublisher = null;
+    private ExecutionContextFactory ecf = null;
 
     /**
      * Return a name that the factory will be available under through the ExecutionContextFactory.getToolFactory()
@@ -46,26 +42,7 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
      */
     @Override
     public void init(ExecutionContextFactory ecf) {
-        this.initHttpClient();
-        this.publicPublisher = new HttpPublisher(this.httpClient);
-        this.publisherMap.clear();
-
-        EntityFind find = ecf.getEntity().find(STORE_ENTITY_NAME);
-        find.selectField("productStoreId")
-                //.selectField("organizationPartyId")
-                .selectField("notificationUrl")
-                .selectField("subscribedEntities");
-        find.condition("notificationUrl", EntityCondition.IS_NOT_NULL, null)
-                .condition("subscribedEntities", EntityCondition.IS_NOT_NULL, null);
-        find.useCache(true);
-        find.disableAuthz();
-        EntityList eList = find.list();
-        for(EntityValue e : eList) {
-            this.initInstance(e);
-        }
-    }
-
-    private void initHttpClient() {
+        this.ecf = ecf;
         SslContextFactory.Client sslContextFactory = new SslContextFactory.Client(true);
         ClientConnector clientConnector = new ClientConnector();
         clientConnector.setSslContextFactory(sslContextFactory);
@@ -92,21 +69,27 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
             logger.error("Cannot start HttpClient: ", e);
         }
     }
-    private HttpPublisher initInstance(EntityValue eStore) {
-        String tenantPrefix = eStore.getTenantPrefix();
-        String storeId = (String) eStore.getNoCheckSimple("productStoreId");
-        String subscribedEntities = (String) eStore.getNoCheckSimple("subscribedEntities");
-        if(tenantPrefix == null
-                || storeId == null || storeId.isEmpty()
-                || subscribedEntities == null
-                || subscribedEntities.isBlank()) {
+
+    private EntityTopic newEntityTopic(EntityValue ev, Map<String, String> params) {
+        StoreInfoCache storeCache = this.ecf.getTool("StoreInfo",
+                StoreInfo.class, "_NA_").storeCache;
+        String tenantPrefix = ev.getTenantPrefix();
+        List<StoreInfo> storeInfos = storeCache.storesByTenant.get(tenantPrefix);
+        if(storeInfos == null || storeInfos.isEmpty()) {
+            logger.info("No active stores found for tenant prefix: " + tenantPrefix);
             return null;
         }
-
-        this.publicPublisher.putSubscriber(eStore);
-        HttpPublisher publisher = this.publisherMap.computeIfAbsent(tenantPrefix, k -> new HttpPublisher(this.httpClient));
-        publisher.putSubscriber(eStore);
-        return publisher;
+        EntityTopic topic = new EntityTopic(this.httpClient, ev, params);
+        for(StoreInfo store : storeInfos) {
+            if(store.uri != null && store.isSubscribing(topic)) {
+                topic.uris.add(store.uri);
+            }
+        }
+        if(topic.uris.isEmpty()) {
+            logger.info("No URIs to send.");
+            return null;
+        }
+        return topic;
     }
 
     /**
@@ -150,57 +133,9 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
         }
 
         EntityValue ev = (EntityValue) parameters[0];
-        boolean isStoreEntity = STORE_ENTITY_NAME.equals(ev.getEntityName());
-        boolean isSubscriberChanged = false;
-
         String on = ((String) parameters[1]).trim().toLowerCase();
-        switch (on) {
-            case "delete":
-                if (isStoreEntity) {
-                    ev.set("notificationUrl", "");
-                    ev.set("subscribedEntities", "");
-                    isSubscriberChanged = true;
-                }
-                break;
-            case "create":
-                if(isStoreEntity) {
-                    isSubscriberChanged = ev.getNoCheckSimple("notificationUrl") != null
-                                    && ev.getNoCheckSimple("subscribedEntities") != null;
-                }
-                break;
-            case "update":
-                if(isStoreEntity) {
-                    isSubscriberChanged = ev.getNoCheckSimple("notificationUrl") != null
-                                    || ev.getNoCheckSimple("subscribedEntities") != null;
-                }
-                break;
-            default:
-                logger.error("Invalid 'on' parameter: " + on);
-                return null;
-        }
 
-        HttpPublisher publisher = this.publicPublisher;
-        String tenantPrefix = ev.getTenantPrefix();
-        if(tenantPrefix != null && !tenantPrefix.isEmpty()) {
-            publisher = this.publisherMap.get(tenantPrefix);
-        }
-
-        if(isSubscriberChanged) {
-            if(publisher == null) { //The input store has not ever subscribed before
-                publisher = initInstance(ev); //already putSubscriber
-            } else {
-                publisher.putSubscriber(ev);
-            }
-            if(this.publicPublisher != publisher) {
-                this.publicPublisher.putSubscriber(ev);
-            }
-        }
-
-        if(publisher == null) {
-            return null;
-        }
-
-        return publisher.newTopic(ev, Map.of("on", on));
+        return this.newEntityTopic(ev, Map.of("on", on));
     }
 
     /**
@@ -208,8 +143,6 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
      */
     @Override
     public void destroy() {
-        this.publisherMap = null;
-        this.publicPublisher = null;
         try {
             httpClient.stop();
         } catch (Exception e) {

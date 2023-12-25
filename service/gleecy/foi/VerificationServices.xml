@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="hash" noun="StoreClient">
+        <in-parameters>
+            <parameter name="storeId" required="true" type="String"/>
+            <parameter name="message" required="true" type = "String"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="hash" type="String" />
+        </out-parameters>
+        <actions>
+            <script>
+                import io.gleecy.foi.StoreInfo
+
+                StoreInfo store = ec.getTool("StoreInfo", StoreInfo.class, storeId)
+                hash = store.hash(message)
+            </script>
+
+        </actions>
+    </service>
+</services>

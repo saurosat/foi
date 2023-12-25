@@ -11,9 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class EntityTopic implements HttpTopic {
     private final static Logger logger = LoggerFactory.getLogger(EntityTopic.class);
@@ -57,11 +55,10 @@ public class EntityTopic implements HttpTopic {
     final HttpClient httpClient;
     final EntityValue ev;
     final Map<String, String> params;
-    Collection<URI> uris;
+    final List<URI> uris = new LinkedList<>();
     int attempts = 0;
-    EntityTopic(EntityValue ev, HttpClient httpClient, Collection<URI> uris, Map<String, String> params) {
+    EntityTopic(HttpClient httpClient, EntityValue ev, Map<String, String> params) {
         this.ev = ev;
-        this.uris = uris;
         this.httpClient = httpClient;
         this.params = params;
     }
