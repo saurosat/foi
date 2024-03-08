@@ -65,6 +65,7 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
 
         try {
             httpClient.start();
+            httpClient.getContentDecoderFactories().clear();
         } catch (Exception e) {
             logger.error("Cannot start HttpClient: ", e);
         }

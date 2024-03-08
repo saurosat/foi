@@ -22,34 +22,34 @@ public class EntityTopic implements HttpTopic {
             logger.info("Notified" + req.getURI().toString() + ". OK");
             return;
         }
-        StringBuilder logError = new StringBuilder("Failed to notify").append(req.getURI().toString());
-        logError.append("\n Notification request: \n");
-        logError.append("\n\t Headers:");
-        req.getHeaders().forEach(reqHF -> logError.append(reqHF.toString()).append("; "));
-        logError.append("\n\t Params:");
-        req.getParams().forEach(reqHF -> logError.append(reqHF.toString()).append("; "));
+        StringBuilder logError = new StringBuilder("Failed to notify ").append(req.getURI().toString());
+//        logError.append("\n Notification request: \n");
+//        logError.append("\n\t Headers:");
+//        req.getHeaders().forEach(reqHF -> logError.append(reqHF.toString()).append("; "));
+//        logError.append("\n\t Params:");
+//        req.getParams().forEach(reqHF -> logError.append(reqHF.toString()).append("; "));
 
         Throwable err = result.getRequestFailure();
         if(err != null) {
-            logError.append("\n Failed when sending request. Error details: ");
-            logger.error(logError.toString(), err);
+            logError.append("\n Request Error: ").append(err.getMessage());
+            logger.error(logError.toString());
             return;
         }
 
         err = result.getResponseFailure();
         if(err != null) {
-            logError.append("\n Failed when receiving response. Error details: ");
-            logger.error(logError.toString(), err);
+            logError.append("\n Response Error: ").append(err.getMessage());
+            logger.error(logError.toString());
             return;
         }
 
-        logError.append("\n Remote server returned ");
-        result.getResponse().getHeaders().forEach(header -> logError.append(header.toString()).append("; "));
-        if(result.getFailure() != null) {
-            logError.append(" exception: ");
+        //logError.append("\n Remote server returned ");
+        //result.getResponse().getHeaders().forEach(header -> logError.append(header.toString()).append("; "));
+        err = result.getFailure();
+        if(err != null) {
+            logError.append(" Error: ").append(err.getMessage());
             logger.error(logError.toString(), result.getFailure());
-        } else
-            logger.error(logError.toString());
+        }
     }
 
     final HttpClient httpClient;

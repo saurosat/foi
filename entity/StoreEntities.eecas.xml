@@ -15,6 +15,34 @@
             <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic"  in-map="context" out-map="context"/>
         </actions>
     </eeca>
+    <eeca entity="mantle.product.ProductPrice" id="PriceUpdate"
+          get-entire-entity="false" run-on-error="false"
+          on-create="true" on-update="true" on-delete="true">
+        <actions>
+            <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic"  in-map="context" out-map="context"/>
+        </actions>
+    </eeca>
+    <eeca entity="mantle.product.ProductAssoc" id="AssocUpdate"
+          get-entire-entity="false" run-on-error="false"
+          on-create="true" on-update="true" on-delete="true">
+        <actions>
+            <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic"  in-map="context" out-map="context"/>
+        </actions>
+    </eeca>
+    <eeca entity="mantle.product.feature.ProductFeature" id="FeatureUpdate"
+          get-entire-entity="false" run-on-error="false"
+          on-create="true" on-update="true" on-delete="true">
+        <actions>
+            <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic"  in-map="context" out-map="context"/>
+        </actions>
+    </eeca>
+    <eeca entity="mantle.product.feature.ProductFeatureAppl" id="PFAUpdate"
+          get-entire-entity="false" run-on-error="false"
+          on-create="true" on-update="true" on-delete="true">
+        <actions>
+            <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic"  in-map="context" out-map="context"/>
+        </actions>
+    </eeca>
     <eeca entity="mantle.product.category.ProductCategory" id="CategoryUpdate"
           get-entire-entity="false" run-on-error="false"
           on-create="true" on-update="true" on-delete="true">
