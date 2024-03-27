@@ -12,6 +12,8 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 public class EntityTopic implements HttpTopic {
     private final static Logger logger = LoggerFactory.getLogger(EntityTopic.class);
@@ -56,11 +58,13 @@ public class EntityTopic implements HttpTopic {
     final EntityValue ev;
     final Map<String, String> params;
     final List<URI> uris = new LinkedList<>();
+    final ThreadPoolExecutor workerPool;
     int attempts = 0;
-    EntityTopic(HttpClient httpClient, EntityValue ev, Map<String, String> params) {
+    EntityTopic(HttpClient httpClient, EntityValue ev, Map<String, String> params, ThreadPoolExecutor workerPool) {
         this.ev = ev;
         this.httpClient = httpClient;
         this.params = params;
+        this.workerPool = workerPool;
     }
 
     public void send() {
@@ -70,7 +74,7 @@ public class EntityTopic implements HttpTopic {
         EntityDefinition ed = entity.getEntityDefinition();
         FieldInfo[] fieldInfos = ed.entityInfo.allFieldInfoArray;
 
-        Map<String, Object> vMap = new HashMap<>();
+        Map<String, String> vMap = new HashMap<>();
         int numFields = fieldInfos.length;
         for (int i = 0; i < numFields; i++) {
             FieldInfo fieldInfo = fieldInfos[i];
@@ -84,20 +88,22 @@ public class EntityTopic implements HttpTopic {
         if (!startIfNeeded())
             return;
         for (URI uri: uris) {
-            Request request = httpClient.POST(uri).accept("text/html");
-            request.param("entityName", ed.getEntityName());
-            for (Map.Entry<String, Object> entry : vMap.entrySet()) {
-                if (entry.getKey() == null)
-                    continue;
-                request.param(entry.getKey(),
-                        entry.getValue() == null ? "" :  entry.getValue().toString());
-            }
-            if (params != null) {
-                for (Map.Entry<String, String> paramEntry : params.entrySet()) {
-                    request.param(paramEntry.getKey(), paramEntry.getValue());
-                }
-            }
-            request.send(EntityTopic::logResponse);
+            workerPool.execute(new Runnable() {
+                @Override
+                public void run() {
+                    Request request = httpClient.POST(uri).accept("text/html");
+                    request.param("entityName", ed.getEntityName());
+                    request.idleTimeout(30, TimeUnit.SECONDS);
+                    for (Map.Entry<String, String> entry : vMap.entrySet()) {
+                        request.param(entry.getKey(), entry.getValue());
+                    }
+                    if (params != null) {
+                        for (Map.Entry<String, String> paramEntry : params.entrySet()) {
+                            request.param(paramEntry.getKey(), paramEntry.getValue());
+                        }
+                    }
+                    request.send(EntityTopic::logResponse);                }
+            });
         }
     }
 

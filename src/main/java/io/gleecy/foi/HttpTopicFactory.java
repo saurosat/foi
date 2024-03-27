@@ -13,6 +13,7 @@ import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.moqui.context.ExecutionContextFactory;
 import org.moqui.context.ToolFactory;
 import org.moqui.entity.EntityValue;
+import org.moqui.impl.context.ExecutionContextFactoryImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.eclipse.jetty.http2.client.http.ClientConnectionFactoryOverHTTP2;
@@ -74,13 +75,15 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
     private EntityTopic newEntityTopic(EntityValue ev, Map<String, String> params) {
         StoreInfoCache storeCache = this.ecf.getTool("StoreInfo",
                 StoreInfo.class, "_NA_").storeCache;
+
         String tenantPrefix = ev.getTenantPrefix();
         List<StoreInfo> storeInfos = storeCache.storesByTenant.get(tenantPrefix);
         if(storeInfos == null || storeInfos.isEmpty()) {
             logger.info("No active stores found for tenant prefix: " + tenantPrefix);
             return null;
         }
-        EntityTopic topic = new EntityTopic(this.httpClient, ev, params);
+        EntityTopic topic = new EntityTopic(this.httpClient, ev, params,
+                ((ExecutionContextFactoryImpl) this.ecf).workerPool);
         for(StoreInfo store : storeInfos) {
             if(store.uri != null && store.isSubscribing(topic)) {
                 topic.uris.add(store.uri);
