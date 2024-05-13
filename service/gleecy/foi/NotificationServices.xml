@@ -5,33 +5,153 @@
         <in-parameters>
             <parameter name="entityValue" required="true" type = "org.moqui.entity.EntityValue"/>
             <parameter name="eecaOperation" type="String"/>
+            <parameter name="productStoreId" required="false" type="String" />
+            <parameter name="productCategoryId" type="String" required="false" />
         </in-parameters>
+        <out-parameters>
+            <parameter name="published" type="Boolean" />
+        </out-parameters>
         <actions>
+            <set field="published" value="false"/>
             <script>
                 import io.gleecy.foi.HttpTopic
-                HttpTopic topic = ec.getTool("HttpTopic", HttpTopic.class, entityValue, eecaOperation)
+                HttpTopic topic = ec.getTool("HttpTopic", HttpTopic.class, entityValue, eecaOperation, productStoreId, productCategoryId)
                 if(topic != null) {
                     topic.send()
+                    published = true
                 }
             </script>
         </actions>
     </service>
-    <service verb="update" noun="StoreInfo">
+    <service verb="publish" noun="ProductAndDependencies" type="java" location="io.gleecy.foi.EntityTopic" method="publishProduct">
         <in-parameters>
-            <parameter name="productStoreId" required="true" type="String" />
+            <parameter name="product" required="true" type="org.moqui.entity.EntityValue" />
+            <parameter name="on" required="true" type="String" />
+            <parameter name="storeId" required="false" type="String" />
+            <parameter name="productCategoryId" type="String" required="false" />
+        </in-parameters>
+    </service>
+    <service verb="publish" noun="ProductIdAndDependencies" type="java" location="io.gleecy.foi.EntityTopic" method="publishProductId">
+        <in-parameters>
+            <parameter name="productId" required="true" type="String" />
+            <parameter name="on" required="true" type="String" />
+            <parameter name="storeId" required="false" type="String" />
+            <parameter name="productCategoryId" type="String" required="false" />
+        </in-parameters>
+    </service>
+    <service verb="publish" noun="CategoryMember">
+        <in-parameters>
+            <parameter name="entityValue" required="true" type="org.moqui.entity.EntityValue"/>
+            <parameter name="eecaOperation" type="String"/>
+            <parameter name="storeId" required="false" type="String" />
+        </in-parameters>
+        <actions>
+            <set field="published" value="false"/>
+            <script>
+                import io.gleecy.foi.HttpTopic
+                HttpTopic topic = ec.getTool("HttpTopic", HttpTopic.class, entityValue, eecaOperation, storeId)
+                if(topic != null) {
+                    topic.send()
+                    published = true
+                }
+            </script>
+            <if condition="published">
+                <set field="productCategoryId" value="${entityValue.getNoCheckSimple('productCategoryId')}" type="String" />
+                <set field="productId" value="${entityValue.getNoCheckSimple('productId')}" type="String" />
+                <service-call name="gleecy.foi.NotificationServices.publish#ProductIdAndDependencies"
+                              in-map="[productId: productId, on: 'update', storeId:storeId, productCategoryId:productCategoryId]" />
+            </if>
+        </actions>
+    </service>
+    <service verb="publish" noun="StoreProduct">
+        <in-parameters>
             <parameter name="entityValue" required="true" type = "org.moqui.entity.EntityValue"/>
             <parameter name="eecaOperation" type="String"/>
         </in-parameters>
         <actions>
-            <script>
+            <set field="storeId" value="${entityValue.getNoCheckSimple('productStoreId')}" type="String" />
+<!--            <set field="published" value="false"/>-->
+<!--            <script>-->
+<!--                import io.gleecy.foi.HttpTopic-->
+<!--                HttpTopic topic = ec.getTool("HttpTopic", HttpTopic.class, entityValue, eecaOperation, storeId)-->
+<!--                if(topic != null) {-->
+<!--                    topic.send()-->
+<!--                    published = true-->
+<!--                }-->
+<!--            </script>-->
+            <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic" in-map="context" out-map="context" />
+            <if condition="published">
+                <service-call name="gleecy.foi.NotificationServices.publish#ProductIdAndDependencies"
+                              in-map="[productId: entityValue.getNoCheckSimple('productId'), on: eecaOperation, storeId:storeId]" />
+            </if>
+        </actions>
+    </service>
+    <service verb="publish" noun="CategoryAndDependencies">
+        <in-parameters>
+            <parameter name="entityValue" required="true" type = "org.moqui.entity.EntityValue" />
+            <parameter name="productStoreId" required="false" type="String" />
+            <parameter name="eecaOperation" required="true" type="String"/>
+        </in-parameters>
+        <actions>
+            <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic" in-map="context" />
+            <if condition="published">
+                <if condition="productStoreId" >
+                    <entity-find entity-name="ProductCategoryMember" for-update="false" cache="true" list="catProducts">
+                        <econdition field-name="productCategoryId"/>
+                        <date-filter />
+                    </entity-find>
+                    <iterate list="catProducts" entry="catProduct">
+                        <service-call name="gleecy.foi.NotificationServices.publish#CategoryMember"
+                                      in-map="context + [entityValue: catProduct, eecaOperation: 'update']" />
+                    </iterate>
+                </if>
+            </if>
+        </actions>
+    </service>
+    <service verb="publish" noun="CategoryIdAndDependencies">
+        <in-parameters>
+            <parameter name="productCategoryId" type="String" required="true" />
+            <parameter name="productStoreId" required="true" type="String" />
+            <parameter name="eecaOperation" type="String"/>
+        </in-parameters>
+        <actions>
+            <entity-find-one entity-name="mantle.product.category.ProductCategory" value-field="category"
+                             cache="true" for-update="false"/>
+            <service-call name="gleecy.foi.NotificationServices.publish#CategoryAndDependencies" in-map="context + [entityValue: category]" />
+        </actions>
+    </service>
+    <service verb="publish" noun="StoreCategory">
+        <in-parameters>
+            <parameter name="entityValue" required="true" type="org.moqui.entity.EntityValue"/>
+            <parameter name="eecaOperation" type="String"/>
+        </in-parameters>
+        <actions>
+            <set field="published" value="false"/>
+            <set field="productStoreId" value="${entityValue.getNoCheckSimple('productStoreId')}" type="String"/>
+            <set field="productCategoryId" value="${entityValue.getNoCheckSimple('productCategoryId')}" type="String"/>
+            <service-call name="gleecy.foi.NotificationServices.publish#CategoryIdAndDependencies" async="false"
+                          in-map="[eecaOperation: 'update', productStoreId:productStoreId, productCategoryId:productCategoryId]" />
+            <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic"
+                          in-map="context + [productStoreId: productStoreId, productCategoryId: productCategoryId]" />
+        </actions>
+    </service>
+
+    <service verb="update" noun="StoreInfo">
+        <in-parameters>
+            <parameter name="entityValue" required="true" type = "org.moqui.entity.EntityValue"/>
+            <parameter name="eecaOperation" type="String"/>
+        </in-parameters>
+        <actions>
+            <script><![CDATA[
+                import java.util.List
                 import io.gleecy.foi.StoreInfo
 
-                StoreInfo store = ec.getTool("StoreInfo", StoreInfo.class, productStoreId)
+                StoreInfo store = ec.getTool("StoreInfo", StoreInfo.class, entityValue.getNoCheckSimple("productStoreId"))
                 System.out.println("update#StoreInfo: ProductStoreId = " + (productStoreId == null ? "NULL" : productStoreId))
                 if (store != null) {
                     store.update(entityValue, eecaOperation)
                 }
-            </script>
+            ]]></script>
         </actions>
     </service>
 </services>

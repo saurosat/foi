@@ -9,12 +9,16 @@ import org.moqui.entity.EntityValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.Timestamp;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 
 public class StoreInfoCache implements ToolFactory<StoreInfo> {
     private static final Logger logger = LoggerFactory.getLogger(StoreInfoCache.class);
+    public ExecutionContextFactory ecf = null;
+    public ToolFactory<HttpTopic> topicFactory = null;
     public final Map<String, StoreInfo> storeById = new HashMap<>();
     public final Map<String, LinkedList<StoreInfo>> storesByTenant = new HashMap<>();
     /**
@@ -33,6 +37,9 @@ public class StoreInfoCache implements ToolFactory<StoreInfo> {
      */
     @Override
     public void init(ExecutionContextFactory ecf) {
+        this.ecf = ecf;
+        this.topicFactory = ecf.getToolFactory("HttpTopic");
+        Timestamp now = new Timestamp(System.currentTimeMillis());
         EntityFind find = ecf.getEntity().find(StoreInfo.ENAME);
         find.selectField("productStoreId")
                 .selectField("organizationPartyId")
@@ -45,9 +52,9 @@ public class StoreInfoCache implements ToolFactory<StoreInfo> {
         find.disableAuthz();
         EntityList eList = find.list();
         for(EntityValue entity : eList) {
-            StoreInfo store = StoreInfo.newInstance(entity);
+            StoreInfo store = StoreInfo.newInstance(entity, ecf.getEntity());
             if(store != null ){
-                this._addStore(entity);
+                this._addStore(store);
             }
         }
     }
@@ -58,9 +65,6 @@ public class StoreInfoCache implements ToolFactory<StoreInfo> {
             stores.remove(store);
         }
         return store;
-    }
-    synchronized StoreInfo _addStore(EntityValue entity) {
-        return _addStore(StoreInfo.newInstance(entity));
     }
     synchronized StoreInfo _addStore(StoreInfo store) {
         if(store == null) return null;
@@ -88,13 +92,11 @@ public class StoreInfoCache implements ToolFactory<StoreInfo> {
             return null;
         }
         String storeId = null;
+        EntityValue storeEv = null;
         if(parameters[0] instanceof String) {
             storeId = (String) parameters[0];
         } else if(parameters[0] instanceof EntityValue) {
             EntityValue entity = (EntityValue) parameters[0];
-            if(!StoreInfo.ENAME.equals(entity.getEntityName())) {
-                return null;
-            }
             storeId = (String) entity.getNoCheckSimple("productStoreId");
         }
         if(storeId == null || storeId.isEmpty()) {
