@@ -10,6 +10,7 @@ import org.eclipse.jetty.io.ClientConnectionFactory;
 import org.eclipse.jetty.io.ClientConnector;
 import org.eclipse.jetty.util.Pool;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.moqui.context.ExecutionContextFactory;
 import org.moqui.context.ToolFactory;
 import org.moqui.entity.EntityFacade;
@@ -48,14 +49,24 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
     public void init(ExecutionContextFactory ecf) {
         this.ecf = ecf;
         SslContextFactory.Client sslContextFactory = new SslContextFactory.Client(true);
+
+        QueuedThreadPool threadPool = new QueuedThreadPool();
+        threadPool.setName("httpTopicPublisher");
+        threadPool.setMaxThreads(10);
+
         ClientConnector clientConnector = new ClientConnector();
+        //clientConnector.setExecutor(threadPool);
         clientConnector.setSslContextFactory(sslContextFactory);
+        clientConnector.setReuseAddress(true);
+        clientConnector.setReusePort(true);
 
         //ClientConnectionFactoryO
         // Prepare the application protocols.
         ClientConnectionFactory.Info h1 = HttpClientConnectionFactory.HTTP11;
 
         HTTP2Client http2Client = new HTTP2Client(clientConnector);
+        http2Client.setMaxConcurrentPushedStreams(128);
+
         ClientConnectionFactory.Info h2 = new ClientConnectionFactoryOverHTTP2.HTTP2(http2Client);
 
         // Create the HttpClientTransportDynamic, preferring h2 over h1.
@@ -63,8 +74,13 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
         transport.setConnectionPoolFactory(destination ->
                 new MultiplexConnectionPool(destination, Pool.StrategyType.THREAD_ID, 10,true, destination, 1));
 
+
         this.httpClient = new HttpClient(transport);
         httpClient.setFollowRedirects(false);
+        httpClient.setMaxConnectionsPerDestination(10);
+        httpClient.setExecutor(threadPool);
+        httpClient.setRequestBufferSize(50000000);
+        httpClient.setMaxRequestsQueuedPerDestination(2000);
         httpClient.setMaxConnectionsPerDestination(10);
 
         try {
@@ -79,7 +95,7 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
 
         String catId = params.get("productCategoryId");
         Set<String> productCategories = new HashSet<>(); //List of product category to
-        if(catId != null) {
+        if(catId != null && !catId.isEmpty()) {
             productCategories.add(catId);
         }
         catId = (String) ev.getNoCheckSimple("productCategoryId");
@@ -114,7 +130,7 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
 
         List<URI> uris = new ArrayList<>();
         String storeId = params.get("storeId");
-        logger.info("on " + ev.getEntityName() + " " + params.get("on") + " storeId: " + (storeId == null ? "" : storeId) );
+        //logger.info("on " + ev.getEntityName() + " " + params.get("on") + " storeId: " + (storeId == null ? "" : storeId) );
 
         if(storeId != null && !storeId.isEmpty()) {
             StoreInfo store = this.ecf.getTool("StoreInfo",
@@ -191,12 +207,12 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
         if(parameters.length >= 3 && parameters[2] != null) {
             storeId = ((String) parameters[2]).trim();
         }
-        String isViewableCategory = "N";
+        String productCategoryId = "";
         if(parameters.length >= 4 && parameters[3] != null) {
-            isViewableCategory = ((String) parameters[3]).trim();
+            productCategoryId = ((String) parameters[3]).trim();
         }
 
-        return this.newEntityTopic(ev, Map.of("on", on, "storeId", storeId, "viewable", isViewableCategory));
+        return this.newEntityTopic(ev, Map.of("on", on, "storeId", storeId, "productCategoryId", productCategoryId));
     }
 
     /**

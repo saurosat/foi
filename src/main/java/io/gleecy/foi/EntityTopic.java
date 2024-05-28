@@ -307,16 +307,23 @@ public class EntityTopic implements HttpTopic {
         if (!startIfNeeded())
             return;
         for (URI uri: uris) {
-            workerPool.execute(new Runnable() {
-                @Override
-                public void run() {
-                    Request request = httpClient.POST(uri).accept("text/html");
-                    request.idleTimeout(200, TimeUnit.SECONDS);
-                    for (Map.Entry<String, String> paramEntry : params.entrySet()) {
-                        request.param(paramEntry.getKey(), paramEntry.getValue());
-                    }
-                    request.send(EntityTopic::logResponse);                }
-            });
+            Request request = httpClient.POST(uri).accept("text/html");
+            request.idleTimeout(200, TimeUnit.SECONDS);
+            for (Map.Entry<String, String> paramEntry : params.entrySet()) {
+                request.param(paramEntry.getKey(), paramEntry.getValue());
+            }
+            request.send(EntityTopic::logResponse);
+//            workerPool.execute(new Runnable() {
+//                @Override
+//                public void run() {
+//                    Request request = httpClient.POST(uri).accept("text/html");
+//                    request.idleTimeout(200, TimeUnit.SECONDS);
+//                    for (Map.Entry<String, String> paramEntry : params.entrySet()) {
+//                        request.param(paramEntry.getKey(), paramEntry.getValue());
+//                    }
+//                    request.send(EntityTopic::logResponse);
+//                }
+//            });
         }
     }
 
