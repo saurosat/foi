@@ -36,6 +36,8 @@ public class EntityTopic implements HttpTopic {
             "mantle.product.category.ProductCategoryRollup",
             "mantle.product.category.ProductCategoryMember"
     };
+    public static Map<String, Set<String>> excludeFieldMap = Map.of("Product",
+            Set.of("ePftColor", "ePftSize", "ePftBrand", "ePftStyle", "ePftTopic", "ePftArtist", "categories", "prices"));
 
     public static final Map<String, Function<Map<String, String>, Map<String, String>>> transformerMap =
             Map.of(
@@ -261,11 +263,15 @@ public class EntityTopic implements HttpTopic {
         EntityValueBase entity = ((EntityValueBase) ev);
         EntityDefinition ed = entity.getEntityDefinition();
         this.entityName = ed.getEntityName();
+        Set<String> excludedFields = excludeFieldMap.get(this.entityName);
         FieldInfo[] fieldInfos = ed.entityInfo.allFieldInfoArray;
         Map<String, String> evMap = new HashMap<>();
         int numFields = fieldInfos.length;
         for (int i = 0; i < numFields; i++) {
             FieldInfo fieldInfo = fieldInfos[i];
+            if(excludedFields != null && excludedFields.contains((fieldInfo.name))) {
+                continue;
+            }
             Object fieldValue = entity.getKnownField(fieldInfo);
             String sFValue = fieldValue != null ? fieldInfo.convertToString(fieldValue) : "_NA_";
             if(fieldValue != null)
