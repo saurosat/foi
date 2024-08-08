@@ -13,69 +13,55 @@ along with this software (see the LICENSE.md file). If not, see
 <http://creativecommons.org/publicdomain/zero/1.0/>.
 -->
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
-
-    <!-- Login and Register for eCommerce -->
-    <service verb="create" noun="Account">
+    <service verb="login" noun="Anonymous">
         <in-parameters>
-            <parameter name="firstName" default-value="_NA_"/>
-            <parameter name="middleName"/>
-            <parameter name="lastName" default-value="_NA_"/>
-            <parameter name="emailAddress"><text-email/></parameter>
-            <parameter name="username" default="emailAddress"/>
-            <parameter name="newPassword"/>
-            <parameter name="newPasswordVerify" required="true"/>
-
-            <parameter name="currencyUomId"/><parameter name="locale"/><parameter name="timeZone"/>
+            <parameter name="partyId"/>
+            <parameter name="password"/>
         </in-parameters>
         <out-parameters>
-            <parameter name="emailContactMechId"/>
+            <parameter name="partyId" required="true"/>
+            <parameter name="password" required="true"/>
             <parameter name="apiKey"/>
             <parameter name="moquiSessionToken"/>
             <parameter name="customerInfo" type="Map"/>
         </out-parameters>
         <actions>
-            <set field="storeId" from="ec.web.request.getHeader('store')"/>
-            <script><![CDATA[
-                if(storeId != null && storeId.length > 9 && storeId.startsWith("P")) {
-                    String tenantPrefix = storeId.subString(0, 9);
-                    ec.context.put("partyId", tenantPrefix + agentHash)
-                }
-            ]]></script>
+            <set field="loggedIn" from="partyId &amp;&amp; password &amp;&amp; ec.user.loginUser(partyId, password)" />
+            <if condition="!loggedIn" >
+                <set field="productStoreId" from="ec.web.request.getHeader('store')"/>
+                <if condition="!productStoreId"><return message="Header parameter 'store' is missing" error="true" /> </if>
 
-            <!-- create account and login -->
-            <service-call name="mantle.party.PartyServices.create#Account" in-map="context + [roleTypeId:'Customer', loginAfterCreate:false]"/>
+                <entity-find-one entity-name="mantle.product.store.ProductStore" value-field="productStore" cache="true" for-update="false" />
+                <if condition="!productStore"><return message="Product Store ${productStoreId} is not found" error="true" /> </if>
 
-            <if condition="ec.user.userAccount != null">
-                <set field="customerPartyId" from="ec.user.userAccount.partyId"/>
-                <!-- NOTE: use the web session for attributes such as cartOrderId for security; this won't work in a stateless mode or outside a web session -->
-                <set field="sessionAttributes" from="ec.web.sessionAttributes"/>
-                <set field="sessionAttributes.customerPartyId" from="customerPartyId"/>
-                <set field="cartOrderId" from="sessionAttributes.cartOrderId"/>
+                <set field="ownerPartyId" from="productStore.organizationPartyId" type="String" />
 
-                <!-- if a cartOrderId is in the session set the logged in user as the customer -->
-                <if condition="cartOrderId">
-                    <!-- NOTE: make sure cartOrder has no customerPartyId, ie only find those with null to avoid order takeover -->
-                    <entity-find entity-name="OrderPart" list="orderPartList">
-                        <econdition field-name="orderId" from="cartOrderId"/>
-                        <econdition field-name="customerPartyId" operator="is-null"/>
-                    </entity-find>
-                    <if condition="orderPartList">
-                        <set field="orderPart" from="orderPartList[0]"/>
-                        <set field="orderPart.customerPartyId" from="customerPartyId"/>
-                        <entity-update value-field="orderPart"/>
-                    </if>
-                </if>
+                <service-call name="create#mantle.party.Party" out-map="newPartyOut"
+                              in-map="[partyTypeEnumId:'PtyAnonymous', ownerPartyId:ownerPartyId, customerStatusId:'CS_UNVERIFIED']"/>
+                <set field="partyId" from="newPartyOut.partyId"/>
+                <service-call name="create#mantle.party.PartyRole" in-map="[partyId:partyId, roleTypeId:'Customer']"/>
 
-                <!-- create the login key to return -->
-                <set field="apiKey" from="ec.user.getLoginKey()"/>
-                <set field="moquiSessionToken" from="ec.web.sessionToken"/>
-
-                <!-- get customer info for convenience -->
-                <service-call name="popstore.CustomerServices.get#CustomerInfo" out-map="customerInfo"/>
+                <set field="password" from="productStore.secretKey" type="String" />
+                <script>
+                    import org.moqui.util.StringUtilities
+                    import org.apache.commons.lang3.StringUtils
+                    int hashVal = StringUtilities.hash(0, password)
+                    hashVal = StringUtilities.hash(hashVal, partyId)
+                    password = StringUtils.leftPad(Integer.toHexString(hashVal), 8, '~');
+                </script>
+                <service-call name="org.moqui.impl.UserServices.create#UserAccount"
+                              in-map="[userId:partyId, username:partyId, userFullName:'Anonymous', newPassword:password, newPasswordVerify:password]" out-map="newUaOut"/>
+                <script>ec.user.loginUser(partyId, password)</script>
             </if>
+
+            <service-call name="gleecy.foi.CustomerServices.postLogin#Customer" in-map="context" out-map="context"/>
+            <!-- create the login key to return -->
+            <set field="apiKey" from="ec.user.getLoginKey()"/>
         </actions>
     </service>
-    <service verb="login" noun="Customer" authenticate="anonymous-all">
+    <!-- Login and Register for eCommerce -->
+
+    <service verb="login" noun="Customer">
         <in-parameters>
             <parameter name="username" required="true"/>
             <parameter name="password" required="true"/>
@@ -98,7 +84,7 @@ along with this software (see the LICENSE.md file). If not, see
 
             <script>ec.user.loginUser(username, password)</script>
 
-            <service-call name="popstore.CustomerServices.postLogin#Customer" in-map="context" out-map="context"/>
+            <service-call name="gleecy.foi.CustomerServices.postLogin#Customer" in-map="context" out-map="context"/>
             <!-- create the login key to return -->
             <set field="apiKey" from="ec.user.getLoginKey()"/>
         </actions>
@@ -150,7 +136,7 @@ along with this software (see the LICENSE.md file). If not, see
                 <set field="moquiSessionToken" from="ec.web.sessionToken"/>
 
                 <!-- get customer info for convenience -->
-                <service-call name="popstore.CustomerServices.get#CustomerInfo" out-map="customerInfo"/>
+                <service-call name="gleecy.foi.CustomerServices.get#CustomerInfo" out-map="customerInfo"/>
             </if>
         </actions>
     </service>
@@ -182,7 +168,7 @@ along with this software (see the LICENSE.md file). If not, see
                 ec.artifactExecution.disableAuthz()
                 if (ec.entity.find("moqui.security.UserAccount").condition("username", fbUser.email).count() == 0) {
                     // no UserAccount for the email and we should create one with corresponding party
-                    Map partiesByEmail = ec.service.sync().name("popstore.CustomerServices.find#PartyByEmail")
+                    Map partiesByEmail = ec.service.sync().name("gleecy.foi.CustomerServices.find#PartyByEmail")
                             .parameters(emailAddress: fbUser.email).call();
                     def partyId
                     Set partyIds = partiesByEmail.partyIds;
@@ -202,7 +188,7 @@ along with this software (see the LICENSE.md file). If not, see
                 userFacade.internalLoginUser(fbUser.email)
             </script>
 
-            <service-call name="popstore.CustomerServices.postLogin#Customer" in-map="context" out-map="context"/>
+            <service-call name="gleecy.foi.CustomerServices.postLogin#Customer" in-map="context" out-map="context"/>
         </actions>
     </service>
 
@@ -237,7 +223,7 @@ along with this software (see the LICENSE.md file). If not, see
         </actions>
     </service>
 
-    <service verb="reset" noun="Password" authenticate="anonymous-all">
+    <service verb="reset" noun="Password">
         <in-parameters>
             <parameter name="username"/>
         </in-parameters>
@@ -250,7 +236,7 @@ along with this software (see the LICENSE.md file). If not, see
         </actions>
     </service>
 
-    <service verb="logout" noun="Customer" authenticate="anonymous-all">
+    <service verb="logout" noun="Customer">
         <actions>
             <script>ec.user.logoutUser()</script>
         </actions>
@@ -312,7 +298,7 @@ along with this software (see the LICENSE.md file). If not, see
                 <set field="moquiSessionToken" from="ec.web.sessionToken"/>
 
                 <!-- get customer info for convenience -->
-                <service-call name="popstore.CustomerServices.get#CustomerInfo" out-map="customerInfo"/>
+                <service-call name="gleecy.foi.CustomerServices.get#CustomerInfo" out-map="customerInfo"/>
             </if>
         </actions>
     </service>
@@ -360,7 +346,7 @@ along with this software (see the LICENSE.md file). If not, see
             <parameter name="customerInfo" type="Map"/>
         </out-parameters>
         <actions>
-            <service-call name="popstore.CartServices.get#ActiveOrderAndCustomer" out-map="context"/>
+            <service-call name="gleecy.foi.CartServices.get#ActiveOrderAndCustomer" out-map="context"/>
             <if condition="!customerPartyId"><return message="No active customer"/></if>
             <set field="partyId" from="customerPartyId"/>
             <set field="orderId" from="cartOrderId"/>
@@ -370,11 +356,11 @@ along with this software (see the LICENSE.md file). If not, see
             <service-call name="mantle.party.ContactServices.store#PartyContactInfo" in-map="[partyId:partyId, telecomContactMechPurposeId: 'PhonePrimary', contactNumber: contactNumber, contactMechId: contactMechId]"
                 out-map="context"/>
 
-            <service-call name="popstore.CustomerServices.get#CustomerInfo" out-map="customerInfo"/>
+            <service-call name="gleecy.foi.CustomerServices.get#CustomerInfo" out-map="customerInfo"/>
         </actions>
     </service>
 
-    <service verb="update" noun="CustomerPassword" authenticate="anonymous-all">
+    <service verb="update" noun="CustomerPassword" >
         <in-parameters>
             <parameter name="userId"/>
             <parameter name="username"/>
@@ -441,12 +427,16 @@ along with this software (see the LICENSE.md file). If not, see
             <parameter name="emailContactMechId"/>
         </out-parameters>
         <actions>
-            <service-call name="popstore.CartServices.get#ActiveOrderAndCustomer" out-map="context"/>
+            <service-call name="gleecy.foi.CartServices.get#ActiveOrderAndCustomer" out-map="context"/>
             <if condition="!customerPartyId"><return message="No active customer"/></if>
             <set field="partyId" from="customerPartyId"/>
             <set field="orderId" from="cartOrderId"/>
 
-            <!-- TODO: if no customerPartyId call service to create one now and set in session (no user account aka 'anonymous') -->
+            <!-- if no customerPartyId call service to create one now and set in session (no user account aka 'anonymous') -->
+            <if condition="!customerPartyId">
+                <service-call name="gleecy.foi.CustomerServices.login#Anonymous" out-map="context"/>
+                <set field="customerPartyId" from="partyId" />
+            </if>
 
             <service-call name="mantle.account.PaymentMethodServices.store#PaymentMethodInfo" in-map="context" out-map="context"/>
 
@@ -459,7 +449,7 @@ along with this software (see the LICENSE.md file). If not, see
             <parameter name="paymentMethodId"/>
         </in-parameters>
         <actions>
-            <service-call name="popstore.CartServices.get#ActiveOrderAndCustomer" out-map="context"/>
+            <service-call name="gleecy.foi.CartServices.get#ActiveOrderAndCustomer" out-map="context"/>
             <if condition="!customerPartyId"><return message="No active customer"/></if>
             <set field="partyId" from="customerPartyId"/>
             <set field="orderId" from="cartOrderId"/>
@@ -515,12 +505,16 @@ along with this software (see the LICENSE.md file). If not, see
             <parameter name="emailContactMechId"/>
         </out-parameters>
         <actions>
-            <service-call name="popstore.CartServices.get#ActiveOrderAndCustomer" out-map="context"/>
+            <service-call name="gleecy.foi.CartServices.get#ActiveOrderAndCustomer" out-map="context"/>
             <if condition="!customerPartyId"><return message="No active customer"/></if>
             <set field="partyId" from="customerPartyId"/>
             <set field="orderId" from="cartOrderId"/>
 
-            <!-- TODO: if no customerPartyId call service to create one now and set in session (no user account aka 'anonymous') -->
+            <!-- if no customerPartyId call service to create one now and set in session (no user account aka 'anonymous') -->
+            <if condition="!customerPartyId">
+                <service-call name="gleecy.foi.CustomerServices.login#Anonymous" out-map="context"/>
+                <set field="customerPartyId" from="partyId" />
+            </if>
 
             <service-call name="mantle.party.ContactServices.store#PartyContactInfo" in-map="context" out-map="context"/>
 
@@ -534,7 +528,7 @@ along with this software (see the LICENSE.md file). If not, see
             <parameter name="contactMechPurposeId"/>
         </in-parameters>
         <actions>
-            <service-call name="popstore.CartServices.get#ActiveOrderAndCustomer" out-map="context"/>
+            <service-call name="gleecy.foi.CartServices.get#ActiveOrderAndCustomer" out-map="context"/>
             <if condition="!customerPartyId"><return message="No active customer"/></if>
             <set field="partyId" from="customerPartyId"/>
             <set field="orderId" from="cartOrderId"/>

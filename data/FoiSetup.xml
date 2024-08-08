@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<entity-facade-xml type="seed-initial">
+    <moqui.basic.Enumeration description="Anonymous Party" enumId="PtyAnonymous" enumTypeId="PartyType"/>
+    <moqui.basic.StatusItem description="Unverified" sequenceNum="1" statusId="CS_UNVERIFIED" statusTypeId="CustomerStatus"/>
+    <moqui.basic.StatusItem description="Unverified" sequenceNum="2" statusId="CS_VERIFIED" statusTypeId="CustomerStatus"/>
+
+</entity-facade-xml>

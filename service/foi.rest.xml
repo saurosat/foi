@@ -16,24 +16,24 @@ along with this software (see the LICENSE.md file). If not, see
 <!-- General Guideline Verbs: GET=find, POST=create/do, PUT=store (create or update), PATCH=update, DELETE=delete  -->
 
 <resource xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/rest-api-3.xsd"
-        name="pop" displayName="POP REST Store API" version="1.0.0" description="Services for eCommerce">
+        name="foi" displayName="FOI REST API" version="1.0.0" description="Services for eCommerce">
 
     <!-- Login and Register -->
-    <resource name="login" require-authentication="anonymous-view">
+    <resource name="login">
         <method type="post"><service name="gleecy.foi.CustomerServices.login#Customer"/></method></resource>
 <!-- This endpoint is DANGEROUS! don't use this until the service is fixed! -->
-<!--    <resource name="loginFB" require-authentication="anonymous-view">-->
+<!--    <resource name="loginFB">-->
 <!--        <method type="post"><service name="gleecy.foi.CustomerServices.loginFB#Customer"/></method></resource>-->
-    <resource name="logout" require-authentication="anonymous-view">
+    <resource name="logout">
         <method type="get"><service name="gleecy.foi.CustomerServices.logout#Customer"/></method></resource>
-    <resource name="register" require-authentication="anonymous-all">
+    <resource name="register">
         <method type="post"><service name="gleecy.foi.CustomerServices.register#Customer"/></method></resource>
-    <resource name="resetPassword" require-authentication="anonymous-all">
+    <resource name="resetPassword">
         <method type="post"><service name="gleecy.foi.CustomerServices.reset#Password"/></method></resource>
 
     <!-- Geo, Locale, TimeZone -->
 
-<!--    <resource name="geos" require-authentication="anonymous-view">-->
+<!--    <resource name="geos">-->
 <!--        <method type="get"><service name="gleecy.foi.StoreServices.get#Geos"/></method>-->
 <!--        <id name="geoId">-->
 <!--            <method type="get"><entity name="geos" masterName="default" operation="one"/></method>-->
@@ -41,10 +41,10 @@ along with this software (see the LICENSE.md file). If not, see
 <!--                <method type="get"><service name="org.moqui.impl.BasicServices.get#GeoRegionsForDropDown"/></method></resource>-->
 <!--        </id>-->
 <!--    </resource>  -->
-<!--    <resource name="locale" require-authentication="anonymous-view">-->
+<!--    <resource name="locale">-->
 <!--        <method type="get"><service name="gleecy.foi.StoreServices.get#Locales"/></method>-->
 <!--    </resource>-->
-<!--    <resource name="timeZone" require-authentication="anonymous-view">-->
+<!--    <resource name="timeZone">-->
 <!--        <method type="get"><service name="gleecy.foi.StoreServices.get#TimeZones"/></method>-->
 <!--    </resource>-->
 
@@ -55,7 +55,9 @@ along with this software (see the LICENSE.md file). If not, see
             <method type="get"><service name="gleecy.foi.CartServices.get#CartInfo"/></method>
         </resource>
         <resource name="add">
-            <method type="post"><service name="gleecy.foi.CartServices.add#Product"/></method>
+            <method type="post">
+                <service name="gleecy.foi.CartServices.add#Product"/>
+            </method>
         </resource>
 
         <resource name="updateProductQuantity">
@@ -74,18 +76,18 @@ along with this software (see the LICENSE.md file). If not, see
         <resource name="shippingOptions">
             <method type="get"><service name="gleecy.foi.CartServices.get#ShippingOptions"/></method>
         </resource>
-        <resource name="billingShipping">
+        <resource name="billingShipping" require-authentication="true">
             <method type="post"><service name="gleecy.foi.CartServices.set#BillingShippingInfo"/></method>
         </resource>
 
-        <resource name="place">
+        <resource name="place" require-authentication="true">
             <method type="post"><service name="gleecy.foi.CartServices.place#CartOrder"/></method>
         </resource>
     </resource>
 
     <!-- Customer Profile and Order History -->
 
-    <resource name="customer" require-authentication="anonymous-view">
+    <resource name="customer">
         <!-- NOTE: allows current session with customerPartyId server side for customers with no UserAccount (current session only), so auth not required -->
         <resource name="info">
             <method type="get"><service name="gleecy.foi.CustomerServices.get#CustomerInfo"/></method>
@@ -93,7 +95,7 @@ along with this software (see the LICENSE.md file). If not, see
         <resource name="updateInfo">
             <method type="put"><service name="gleecy.foi.CustomerServices.update#Customer"/></method>
         </resource>
-        <resource name="updatePassword" require-authentication="anonymous-all">
+        <resource name="updatePassword">
             <method type="put"><service name="gleecy.foi.CustomerServices.update#CustomerPassword"/></method>
         </resource>
         <resource name="paymentMethods">

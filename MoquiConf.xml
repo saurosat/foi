@@ -6,5 +6,12 @@
         <tool-factory class="io.gleecy.foi.StoreInfoCache" init-priority="20" disabled="false"/>
         <tool-factory class="io.gleecy.foi.HttpTopicFactory" init-priority="20" disabled="false"/>
     </tools>
+    <screen-facade>
+        <screen location="component://webroot/screen/webroot/rest.xml">
+
+            <subscreens-item name="store" menu-title="POP REST Store" menu-include="false"
+                             location="component://PopRestStore/screen/store.xml"/>
+        </screen>
+    </screen-facade>
 
 </moqui-conf>
