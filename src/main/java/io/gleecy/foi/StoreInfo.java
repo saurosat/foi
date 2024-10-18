@@ -5,6 +5,7 @@ import org.moqui.entity.EntityFacade;
 import org.moqui.entity.EntityFind;
 import org.moqui.entity.EntityList;
 import org.moqui.entity.EntityValue;
+import org.moqui.impl.entity.EntityJavaUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,20 +71,20 @@ public class StoreInfo {
         if(ownerPartyId != null && !ownerPartyId.isBlank()) {
             store.ownerPartyId = ownerPartyId;
         }
-        String sENames = (String) eStore.getNoCheckSimple("subscribedEntities");
-        if(sENames != null) {
-            String[] eNames = null;
-            sENames = sENames.trim();
-            //1. Update subscribed entities.
-            if(!sENames.isEmpty() && !"_NA_".equals(sENames)) {
-                eNames = sENames.split(",");
-            }
-            for (String eName : eNames) {
-                if(eName == null || (eName = eName.trim()).isEmpty() || "_NA_".equals(eName))
-                    continue;
-                store.subscribedEntities.put(eName, eName); //Use Map for upgrade later
-            }
-        }
+//        String sENames = (String) eStore.getNoCheckSimple("subscribedEntities");
+//        if(sENames != null) {
+//            String[] eNames = null;
+//            sENames = sENames.trim();
+//            //1. Update subscribed entities.
+//            if(!sENames.isEmpty() && !"_NA_".equals(sENames)) {
+//                eNames = sENames.split(",");
+//            }
+//            for (String eName : eNames) {
+//                if(eName == null || (eName = eName.trim()).isEmpty() || "_NA_".equals(eName))
+//                    continue;
+//                store.subscribedEntities.put(eName, eName); //Use Map for upgrade later
+//            }
+//        }
         String sUri = (String) eStore.getNoCheckSimple("notificationUrl");
         if(sUri != null && !(sUri = sUri.trim()).isEmpty()) {
             try {
@@ -111,14 +112,14 @@ public class StoreInfo {
     URI uri = null;
     boolean initialized = false;
     public StoreInfoCache storeCache = null;
-    public final Map<String, String> subscribedEntities = new HashMap<>();
+    //public final Map<String, String> subscribedEntities = new HashMap<>();
     public final Map<String, Object> categoryIds = new ConcurrentHashMap<>();
     public final Map<String, Object> productIds = new ConcurrentHashMap<>();
     public final Map<String, Object> viewableCategoryIds = new ConcurrentHashMap<>();
 
     StoreInfo (String storeId) {
         this.storeId = storeId;
-        if(this.storeId.startsWith("P")) {
+        if(this.storeId.startsWith(EntityJavaUtil.TENANT_KEY_PREFIX)) {
             this.tenantPrefix = this.storeId.substring(0, 9);
         } else {
             this.tenantPrefix = "";
@@ -236,7 +237,7 @@ public class StoreInfo {
         return viewableCategoryIds.containsKey(categoryId) || categoryIds.containsKey(categoryId);
     }
     public boolean isSubscribing(EntityValue ev, Set<String> productCategoryIds) {
-        if(!this.initialized || this.uri == null || this.subscribedEntities.isEmpty()) {
+        if(!this.initialized || this.uri == null) {// || this.subscribedEntities.isEmpty()) {
             return false;
         }
 //        if(!this.subscribedEntities.containsKey(ev.getEntityName())) {
@@ -248,22 +249,23 @@ public class StoreInfo {
         }
 
         String parentCategoryId = (String) ev.getNoCheckSimple("parentProductCategoryId");
-        String categoryId = (String) ev.getNoCheckSimple("productCategoryId");
-        String productId = (String) ev.getNoCheckSimple("productId");
+        String evCategoryId = (String) ev.getNoCheckSimple("productCategoryId");
+        String evProductId = (String) ev.getNoCheckSimple("productId");
         if(parentCategoryId != null) { //table ProductCategoryRollup
-            logger.debug("parentCategoryId=" + parentCategoryId + ", categoryId" + (categoryId == null ? "" : categoryId));
+            logger.debug("parentCategoryId=" + parentCategoryId + ", categoryId"
+                    + (evCategoryId == null ? "" : evCategoryId));
             if(!isCatSubscribed(parentCategoryId)) return false;
-            return categoryId != null && isCatSubscribed(categoryId);
+            return evCategoryId != null && isCatSubscribed(evCategoryId);
         }
 
-        if(categoryId != null) {
-            logger.debug(", categoryId = " + categoryId );
-            if(viewableCategoryIds.containsKey(categoryId)) return true;
-            if(!categoryIds.containsKey(categoryId)) {
+        if(evCategoryId != null) {
+            logger.debug(", categoryId = " + evCategoryId );
+            if(viewableCategoryIds.containsKey(evCategoryId)) return true;
+            if(!categoryIds.containsKey(evCategoryId)) {
                 logger.debug(", categoryId not in categoryIds set");
                 return false;
             }
-            if(productId == null) return true;
+            if(evProductId == null) return true;
         }
         // From here categoryId is null OR subscribed
         if(productCategoryIds != null) {
@@ -275,18 +277,18 @@ public class StoreInfo {
             //If no categories matched and productId exists in ProductStoreProducts, return true, otherwise false
         }
         //check productId and productIds from ProductStoreProducts:
-        if(productId != null) {
-            logger.debug(", productId = " + productId );
-            return this.productIds.containsKey(productId);
+        if(evProductId != null) {
+            logger.debug(", productId = " + evProductId );
+            return this.productIds.containsKey(evProductId);
         }
-        return productCategoryIds == null || productIds.isEmpty(); //if productCategoryIds is null, or any Id matched, return true, otherwise false
+        return productCategoryIds == null || productCategoryIds.isEmpty(); //if productCategoryIds is null, or any Id matched, return true, otherwise false
 
         //No need to check tenant because this instance is taken by tenant prefix in HttpTopicFactory
 //        boolean tenantMatched = true;
 //        Map<String, Object> idMap = ev.getPrimaryKeys();
 //        for(Object id : idMap.values()) {
 //            String sId = id.toString();
-//            if(sId.startsWith("P")) {
+//            if(sId.startsWith(EntityJavaUtil.TENANT_KEY_PREFIX)) {
 //                tenantMatched = sId.startsWith(this.tenantPrefix);
 //                break;
 //            }

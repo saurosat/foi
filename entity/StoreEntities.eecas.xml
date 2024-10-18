@@ -22,17 +22,6 @@
         <actions>
             <service-call name="gleecy.foi.NotificationServices.update#StoreInfo" async="false" in-map="context" out-map="context" />
             <service-call name="gleecy.foi.NotificationServices.publish#StoreCategory"  in-map="context" out-map="context"/>
-<!--            <set field="productCategoryId" from="entityValue.getNoCheckSimple('productCategoryId')" />-->
-<!--            <entity-find entity-name="mantle.product.category.ProductCategoryRollup" list="childCatRelations" cache="true" for-update="false">-->
-<!--                <econditions combine="or">-->
-<!--                    <econdition field-name="productCategoryId" from="productCategoryId" />-->
-<!--                    <econdition field-name="parentProductCategoryId" from="productCategoryId" />-->
-<!--                </econditions>-->
-<!--                <date-filter />-->
-<!--            </entity-find>-->
-<!--            <iterate list="childCatRelations" entry="relation" >-->
-<!--                <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic"  in-map="[entityValue: relation, eecaOperation: eecaOperation]"/>-->
-<!--            </iterate>-->
         </actions>
     </eeca>
     <eeca entity="mantle.product.store.ProductStoreCategory" id="StoreCreateCategory"
@@ -63,13 +52,13 @@
           get-entire-entity="false" run-on-error="false"
           on-create="true" on-update="true" on-delete="true">
         <actions>
-            <service-call name="gleecy.foi.NotificationServices.publish#CategoryMember"  in-map="context" out-map="context"/>
+            <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic"  in-map="context" out-map="context"/>
         </actions>
     </eeca>
 
     <eeca entity="mantle.product.Product" id="ProductUpdate"
           get-entire-entity="false" run-on-error="false"
-          on-create="true" on-update="true" on-delete="true">
+          on-create="false" on-update="true" on-delete="true">
         <actions>
             <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic"  in-map="context" out-map="context"/>
         </actions>
@@ -131,7 +120,7 @@
             <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic"  in-map="context" out-map="context"/>
         </actions>
     </eeca>
-    <eeca entity="mantle.product.category.ProductCategoryRollup" id="CategoryUpdate"
+    <eeca entity="mantle.product.category.ProductCategoryRollup" id="RollupUpdate"
           get-entire-entity="false" run-on-error="false"
           on-create="true" on-update="true" on-delete="true">
         <actions>

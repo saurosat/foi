@@ -6,7 +6,7 @@
     <extend-entity entity-name="ProductStore" package="mantle.product.store">
         <field name="secretKey" type="text-short" />
         <field name="notificationUrl" type="text-medium" />
-        <field name="subscribedEntities" type="text-intermediate" />
+<!--        <field name="subscribedEntities" type="text-intermediate" />-->
     </extend-entity>
     <view-entity entity-name="StoreViewableCategories" package="mantle.product.store">
         <member-entity entity-alias="ps" entity-name="mantle.product.store.ProductStore" />

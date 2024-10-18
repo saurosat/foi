@@ -21,25 +21,15 @@ import java.sql.Timestamp;
 import java.util.*;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 public class EntityTopic implements HttpTopic {
-    public static final String[] productEntities = new String[] {
-            "mantle.product.category.ProductCategoryMember",
-            "mantle.product.ProductCalculatedInfo",
-            "mantle.product.ProductGeo",
-            "mantle.product.ProductIdentification",
-            "mantle.product.feature.ProductFeatureAppl",
-            "mantle.product.ProductPrice"
-    };
-    public static final String[] categoryEntities = new String[] {
-            "mantle.product.category.ProductCategoryRollup",
-            "mantle.product.category.ProductCategoryMember"
-    };
-    public static Map<String, Set<String>> excludeFieldMap = Map.of("Product",
+    private static final Logger logger = LoggerFactory.getLogger(EntityTopic.class);
+    private static final int MAX_RETRIES = 5;
+    private static final Map<String, Set<String>> excludeFieldMap = Map.of("Product",
             Set.of("ePftColor", "ePftSize", "ePftBrand", "ePftStyle", "ePftTopic", "ePftArtist", "categories", "prices"));
-
-    public static final Map<String, Function<Map<String, String>, Map<String, String>>> transformerMap =
+    private static final Map<String, Function<Map<String, String>, Map<String, String>>> transformerMap =
             Map.of(
 //               "mantle.product.feature.ProductFeatureAppl", (ev) -> Map.of(
 //                            "entityName", "Product",
@@ -55,153 +45,33 @@ public class EntityTopic implements HttpTopic {
                     "ProductStoreCategory", (ev) -> Map.of(
                             "entityName", "ProductCategory",
                             "productCategoryId", ev.remove("productCategoryId")
-                            ),
-                "ProductCalculatedInfo", (ev) -> Map.of(
+                    ),
+                    "ProductCalculatedInfo", (ev) -> Map.of(
                             "entityName", "Product",
                             "columnPrefix", "statistic.",
                             "productId", ev.remove("productId")
-                            ),
-                "ProductGeo", (ev) -> Map.of(
+                    ),
+                    "ProductGeo", (ev) -> Map.of(
                             "entityName", "Product",
                             "columnPrefix", ev.get("geoId") + "_",
                             "productId", ev.remove("productId"),
                             ev.remove("productGeoPurposeEnumId") + "GeoId", ev.remove("geoId")
-                            ),
-                "ProductIdentification", (ev) -> Map.of(
+                    ),
+                    "ProductIdentification", (ev) -> Map.of(
                             "entityName", "Product",
                             "columnPrefix", ev.get("idValue") + "_",
                             "productId", ev.remove("productId"),
                             ev.remove("productIdTypeEnumId") + "PiId", ev.remove("idValue")
-                        ),
-                "ProductPrice", (ev) -> Map.of(
+                    ),
+                    "ProductPrice", (ev) -> Map.of(
                             "entityName", "Product",
                             // "columnPrefix", ev.get("productPriceId") + "_",
                             "productId", ev.remove("productId"),
                             ev.remove("pricePurposeEnumId") + ev.remove("priceTypeEnumId") + "Price",
-                                ev.remove("price") + " " + ev.remove("priceUomId")
-                        )
+                            ev.remove("price") + " " + ev.remove("priceUomId")
+                    )
             );
-
-    private final static Logger logger = LoggerFactory.getLogger(EntityTopic.class);
-    private final static ThreadLocal<Set<String>> processedIds = new ThreadLocal<>(){
-        @Override protected Set<String> initialValue() {
-            return  new HashSet<>();
-        }
-    };
-    public static void publishProductId(ExecutionContext ec) {
-        final ContextStack cs = ec.getContext();
-        String productId = (String) cs.get("productId");
-        if(processedIds.get().contains(productId)) {
-            return;
-        }
-        processedIds.get().add(productId);
-
-        publishProductId(
-                (EntityFacadeImpl) ec.getEntity(),
-                ec.getFactory().getToolFactory("HttpTopic"),
-                (String) productId,
-                (String) cs.get("on"),
-                (String) cs.get("storeId"),
-                (String) cs.get("productCategoryId"));
-    }
-    private static void publishProductId(EntityFacadeImpl ef, ToolFactory<HttpTopic> toolFactory, String productId, String on, String storeId, String catId) {
-        EntityValue product =
-                ef.fastFindOne("mantle.product.Product", true, true, productId);
-        if(product == null) {
-            logger.error("Cannot find product with ID=" + productId);
-            return;
-        }
-        publishProduct(ef, toolFactory, product, on, storeId, catId);
-    }
-    public static void publishProduct(ExecutionContext ec) {
-        final ContextStack cs = ec.getContext();
-        EntityValue product = (EntityValue) cs.get("product");
-        if(product == null) return;
-        String productId = (String) product.getNoCheckSimple("productId");
-        if(processedIds.get().contains(productId)) {
-            return;
-        }
-        processedIds.get().add(productId);
-
-        publishProduct(
-            (EntityFacadeImpl) ec.getEntity()
-            , ec.getFactory().getToolFactory("HttpTopic")
-            , product
-            , (String) cs.get("on")
-            , (String) cs.get("storeId")
-            , (String) cs.get("productCategoryId"));
-    }
-
-    /**
-     * Must check if this product is processed before calling this method
-     *         String productId = (String) product.getNoCheckSimple("productId");
-     *         if(processedIds.get().contains(productId)) {
-     *             return;
-     *         }
-     * @param ef
-     * @param toolFactory
-     * @param product
-     * @param on
-     * @param storeId
-     * @param catId
-     */
-    private static void publishProduct(EntityFacadeImpl ef, ToolFactory<HttpTopic> toolFactory, EntityValue product, String on, String storeId, String catId) {
-        HttpTopic topic = toolFactory.getInstance(product, on, storeId, catId);
-        if(topic == null) {
-            return;
-        }
-        topic.send();
-        String productId = (String) product.getNoCheckSimple("productId");
-        for (String productEntity : productEntities) {
-            EntityDefinition ed = ef.getEntityDefinition(productEntity);
-            EntityFind finder = ed.makeEntityFind()
-                    .condition("productId", productId)
-                    .forUpdate(false).useCache(true).disableAuthz();
-            if (ed.isField("thruDate"))
-                finder.conditionDate(null, null, null);
-
-            EntityList evs = finder.list();
-            for (EntityValue ev : evs) {
-                String keyStr = ev.getPrimaryKeysString();
-                if(!processedIds.get().contains(keyStr)) {
-                    processedIds.get().add(keyStr);
-                    topic = toolFactory.getInstance(ev, on, storeId, catId);
-                    if (topic != null) {
-                        topic.send();
-                    }
-                }
-            }
-        }
-
-        if("PatVirtual".equals((String) product.getNoCheckSimple("productTypeEnumId"))) {
-            EntityFind finder = ef.find("mantle.product.ProductAssoc")
-                    .disableAuthz().useCache(true).forUpdate(false)
-                    .selectField("toProductId")
-                    .condition("productId", productId)
-                    .condition("productAssocTypeEnumId", "PatVariant")
-                    .conditionDate(null, null, null);
-            EntityList children = finder.list();
-            for(EntityValue child : children) {
-                String keyStr = child.getPrimaryKeysString();
-                if(!processedIds.get().contains(keyStr)) {
-                    processedIds.get().add(keyStr);
-                    topic = toolFactory.getInstance(child, on, storeId, catId);
-                    if (topic != null) {
-                        topic.send();
-                    }
-                }
-
-                String childProductId = (String) child.getNoCheckSimple("toProductId");
-                if(!processedIds.get().contains(childProductId)) {
-                    processedIds.get().add(childProductId);
-                    publishProductId(ef, toolFactory, childProductId, on, storeId, catId);
-                }
-            }
-        }
-    }
-
-    public static final int MAX_RETRIES = 5;
-    static void logResponse(Result result) {
+    private static void logResponse(Result result) {
         Request req = result.getRequest();
         if(result.isSucceeded()) {
             logger.info("Notified" + req.getURI().toString() + ". OK");

@@ -91,62 +91,76 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
         }
     }
 
-    private EntityTopic newEntityTopic(EntityValue ev, Map<String, String> params) {
-
-        String catId = params.get("productCategoryId");
-        Set<String> productCategories = new HashSet<>(); //List of product category to
-        if(catId != null && !catId.isEmpty()) {
-            productCategories.add(catId);
+    private Set<String> getCatsFromProductId(EntityValue ev) {
+        Set<String> productCategories = new HashSet<>();
+        String productId = (String) ev.getNoCheckSimple("productId"); //productTypeEnumId
+        if(productId == null) {
+            return productCategories;
         }
-        catId = (String) ev.getNoCheckSimple("productCategoryId");
-        if(catId != null) {
-            productCategories.add(catId);
-        }
-        if(productCategories.isEmpty() && ev.isField("productId")) {
-            String productId = (String) ev.getNoCheckSimple("productId");
-            if(productId != null) {
-                EntityFacade ef = this.ecf.getEntity();
-                EntityFind finder = ef.find("mantle.product.ProductAssoc")
-                        .disableAuthz().useCache(true).forUpdate(false)
-                        .selectField("productId")
-                        .condition("toProductId", productId)
-                        .condition("productAssocTypeEnumId", "PatVariant")
-                        .conditionDate(null, null, null);
-                EntityList parents = finder.list();
-                if(parents != null && !parents.isEmpty()) {
-                    productId = (String) parents.get(0).getNoCheckSimple("productId");
-                }
-                finder = ef.find("mantle.product.category.ProductCategoryMember")
-                        .disableAuthz().useCache(true).forUpdate(false)
-                        .selectField("productCategoryId")
-                        .condition("productId", productId)
-                        .conditionDate(null, null, null);
-                EntityList catMems = finder.list();
-                for(EntityValue catMem : catMems) {
-                    productCategories.add((String) catMem.getNoCheckSimple("productCategoryId"));
-                }
+        String productTypeEnumId = (String) ev.getNoCheckSimple("productTypeEnumId");
+        EntityFacade ef = this.ecf.getEntity();
+        if(productTypeEnumId == null || !productTypeEnumId.equals("PtVirtual")) {
+            EntityFind finder = ef.find("mantle.product.ProductAssoc")
+                    .disableAuthz().useCache(true).forUpdate(false)
+                    .selectField("productId")
+                    .condition("toProductId", productId)
+                    .condition("productAssocTypeEnumId", "PatVariant")
+                    .conditionDate(null, null, null);
+            EntityList parents = finder.list();
+            if(parents != null && !parents.isEmpty()) {
+                productId = (String) parents.getFirst().getNoCheckSimple("productId");
             }
         }
+        EntityFind finder = ef.find("mantle.product.category.ProductCategoryMember")
+                .disableAuthz().useCache(true).forUpdate(false)
+                .selectField("productCategoryId")
+                .condition("productId", productId)
+                .conditionDate(null, null, null);
+        EntityList catMems = finder.list();
+        for(EntityValue catMem : catMems) {
+            productCategories.add((String) catMem.getNoCheckSimple("productCategoryId"));
+        }
+        return productCategories;
+    }
+    private EntityTopic newEntityTopic(EntityValue ev, Map<String, String> params) {
 
-        List<URI> uris = new ArrayList<>();
+        List<StoreInfo> stores = null;
         String storeId = params.get("storeId");
-        //logger.info("on " + ev.getEntityName() + " " + params.get("on") + " storeId: " + (storeId == null ? "" : storeId) );
-
         if(storeId != null && !storeId.isEmpty()) {
             StoreInfo store = this.ecf.getTool("StoreInfo",
                     StoreInfo.class, storeId);
-            if(store != null && store.isSubscribing(ev, productCategories)) {
-                uris.add(store.uri);
+            if(store != null) {
+                stores = new ArrayList<>();
+                stores.add(store);
             }
         } else {
             StoreInfoCache storeCache = this.ecf.getTool("StoreInfo",
                     StoreInfo.class, "_NA_").storeCache;
             String tenantPrefix = ev.getTenantPrefix();
-            List<StoreInfo> stores = storeCache.storesByTenant.get(tenantPrefix);
+            stores = storeCache.storesByTenant.get(tenantPrefix);
+        }
 
-            if(stores != null) {
-                for(StoreInfo store : stores) {
-                    if(store.isSubscribing(ev, productCategories)) {
+        List<URI> uris = new ArrayList<>();
+        if(stores != null) {
+            String catId = params.get("productCategoryId");
+            Set<String> productCategories = new HashSet<>(); //List of product category to
+            if(catId != null && !catId.isEmpty()) {
+                productCategories.add(catId);
+            }
+            catId = (String) ev.getNoCheckSimple("productCategoryId");
+            if(catId != null) {
+                productCategories.add(catId);
+            }
+
+            Set<String> evCategories = null;
+            for(StoreInfo store : stores) {
+                if(store.isSubscribing(ev, productCategories)) {
+                    uris.add(store.uri);
+                } else {
+                    if(evCategories == null) {
+                        evCategories = getCatsFromProductId(ev);
+                    }
+                    if(!evCategories.isEmpty() && store.isSubscribing(ev, evCategories)) {
                         uris.add(store.uri);
                     }
                 }

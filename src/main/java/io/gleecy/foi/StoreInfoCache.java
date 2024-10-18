@@ -44,8 +44,8 @@ public class StoreInfoCache implements ToolFactory<StoreInfo> {
         find.selectField("productStoreId")
                 .selectField("organizationPartyId")
                 .selectField("secretKey")
-                .selectField("notificationUrl")
-                .selectField("subscribedEntities");
+                .selectField("notificationUrl");
+                //.selectField("subscribedEntities");
         find.condition("secretKey", EntityCondition.IS_NOT_NULL, null);
         find.forUpdate(false);
         find.useCache(true);
