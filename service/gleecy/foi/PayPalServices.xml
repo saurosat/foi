@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+    <service verb="get" noun="Token" type="java" location="io.gleecy.foi.service.PayPalServices" method="generateToken">
+        <in-parameters>
+            <parameter name="paymentGatewayConfigId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="token" type="String"/>
+            <parameter name="success" type="Boolean"/>
+        </out-parameters>
+    </service>
+
+    <service verb="submit" noun="Payment" type="java" location="io.gleecy.foi.service.PayPalServices" method="submitPayment">
+        <in-parameters>
+            <parameter name="paymentId"/>
+            <parameter name="payment" type="EntityValue"/>
+            <parameter name="intent" required="true"/>
+            <parameter name="path" required="true"/>
+            <parameter name="newStatus" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="paypalOrderId" />
+            <parameter name="paymentGatewayResponseId"/>
+            <parameter name="payment"/>
+        </out-parameters>
+    </service>
+
+    <service verb="getOrCreate" noun="OrderPartPayment">
+        <in-parameters>
+            <parameter name="orderId" required="true" />
+            <parameter name="orderPartSeqId" required="true" />
+            <parameter name="toPaymentMethodId" required="true" />
+            <parameter name="paymentMethodId" />
+            <parameter name="statusId" default-value="PmntProposed"/>
+            <parameter name="effectiveDate" type="Timestamp"><description>No default value, allow null until effectiveDate known, must be set before Delivered status</description></parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="payment" />
+            <parameter name="payPalOrderId" />
+        </out-parameters>
+        <actions>
+            <!-- 1. Get OrderPart from orderID -->
+            <entity-find-one entity-name="mantle.order.OrderPart" value-field="orderPart" />
+            <!-- 2. If Order information is not valid, return Error -->
+            <if condition="!orderPart">
+                <return error="true" type="info" message="Order ${orderId}, order part ${orderPartSeqId} is not found"/>
+            </if>
+            <if condition="orderPart.validThurDate.before(ec.user.nowTimeStamp)" >
+                <return error="true" type="info" message="Order ${orderId}, order part ${orderPartSeqId} is expired"/>
+            </if>
+            <if condition="!orderPart.customerPartyId || orderPart.vendorPartyId" >
+                <return error="true" type="info" message="Order ${orderId}, order part ${orderPartSeqId}: Customer and/or vendor information is missing."/>
+            </if>
+
+            <set field="amount" from="orderPart.partTotal" />
+            <!-- 3. Search for existing payment -->
+            <entity-find entity-name="mantle.account.payment.Payment" list="partPaymentList">
+                <econdition field-name="orderId"/>
+                <econdition field-name="orderPartSeqId"/>
+                <econdition field-name="statusId" operator="not-in" value="PmntCancelled,PmntVoid,PmntDeclined"/>
+            </entity-find>
+            <if condition="partPaymentList.size() &gt;= 1" >
+                <log level="warn" message="More than 1 payments for single order part" />
+                <iterate list="partPaymentList" entry="partPayment">
+                    <if condition="partPayment.statusId in ['PmntProposed', 'PmntPromised']">
+                        <then> <set field="payment" from="partPayment"/></then>
+                        <else> <set field="amount" from="amount - (partPayment.amount ?: 0)"/></else>
+                    </if>
+                </iterate>
+            </if>
+
+            <!-- 4. Create a Payment object and set payment in context -->
+            <if condition="!payment" >
+                <service-call name="mantle.account.PaymentServices.create#Payment" out-map="context"
+                              in-map="context + [
+                                paymentTypeEnumId: 'PtOrderPref',
+                                fromPartyId:orderPart.vendorPartyId,
+                                toPartyId:toPartyId.customerPartyId,
+                                statusId: 'PmntProposed',
+                                amount: amount
+                                ]" />
+                <entity-find-one entity-name="mantle.account.payment.Payment" value-field="payment" for-update="true" />
+            </if>
+            <!-- 5. Request PayPal to create a PayPal Order and return payPalOrderId and payment -->
+            <service-call name="gleecy.foi.PayPalServices.submit#Payment" out-map="context"
+                          in-map="context + [
+                path: '/v2/checkout/orders/',
+                intent: 'AUTHORIZE',
+                newStatus: 'PmntPromised'
+                payment: payment]"/>
+        </actions>
+    </service>
+    <service verb="authorize" noun="Payment">
+        <implements service="mantle.account.PaymentServices.authorize#Payment"/>
+        <actions>
+            <log message="====Paypal Authorize: $paymentGatewayConfigId"/>
+            <entity-find-one entity-name="mantle.account.payment.Payment" value-field="payment" />
+            <service-call name="gleecy.foi.PayPalServices.submit#Payment" out-map="context"
+                          in-map="context + [
+                path: '/v2/checkout/orders/${payment.paymentRefNum}/authorize',
+                intent: 'AUTHORIZE',
+                payment: payment,
+                newStatus: 'PmntAuthorized']"/>
+        </actions>
+    </service>
+
+    <service verb="capture" noun="Payment">
+        <implements service="mantle.account.PaymentServices.capture#Payment"/>
+        <actions>
+            <log message="====Paypal Capture $paymentGatewayConfigId "/>
+            <service-call name="gleecy.foi.PayPalServices.perform#PaypalApi" out-map="context"
+                          in-map="context + [
+                    path: '/v2/checkout/orders',
+                    intent: 'CAPTURE',
+                    paymentId: paymentId]"/>
+        </actions>
+    </service>
+
+    <service verb="release" noun="Payment">
+        <implements service="mantle.account.PaymentServices.release#Payment"/>
+        <actions>
+            <log message="===Paypal release"/>
+            <service-call name="gleecy.foi.PayPalServices.perform#PaypalApi" out-map="context"
+                          in-map="[
+                intent: 'RELEASE',
+                paymentId: paymentId]"/>
+        </actions>
+    </service>
+
+    <service verb="refund" noun="Payment">
+        <implements service="mantle.account.PaymentServices.refund#Payment"/>
+        <actions>
+            <log message="====Paypal refund"/>
+            <service-call name="gleecy.foi.PayPalServices.perform#PaypalApi" out-map="context"
+                          in-map="[
+                intent: 'REFUND',
+                paymentId: paymentId]"/>
+        </actions>
+    </service>
+
+    <service verb="get" noun="GatewayInfo">
+        <in-parameters><parameter name="paymentGatewayConfigId" required="true"/></in-parameters>
+        <out-parameters><parameter name="gatewayInfoMap" type="Map"/></out-parameters>
+        <actions>
+            <log message="====paypal get#GatewayInfo"/>
+            <return/>
+
+            <entity-find-one entity-name="Paypal.PaymentGatewayPaypal" value-field="pgan"/>
+            <set field="gatewayInfoMap" from="[x_login:pgan.login, x_tran_key:pgan.tranKey,
+                    x_version:pgan.apiVersion, x_duplicate_window:pgan.duplicateWindow,
+                    x_test_request:pgan.testRequest, x_delim_data:'TRUE', x_delim_char:'|', x_relay_response:'FALSE',
+                    x_email_customer:pgan.emailCustomer, x_email_merchant:pgan.emailMerchant]"/>
+            <!-- NOTE: not setting x_encap_char, should not be needed with pipe delimeter -->
+            <!-- handle these later: x_cpversion:pgan.cpVersion, x_market_type:pgan.cpMarketType, x_device_type:pgan.cpDeviceType,  -->
+        </actions>
+    </service>
+    <service verb="get" noun="PaymentGatewayInfo">
+        <in-parameters><parameter name="paymentId" required="true"/></in-parameters>
+        <out-parameters><parameter name="paymentInfoMap" type="Map"/></out-parameters>
+        <actions>
+            <log message="====paypal get#PaymentGatewayInfo"/>
+            <return/>
+
+            <entity-find-one entity-name="mantle.account.payment.Payment" value-field="payment"/>
+            <set field="creditCard" from="payment.'mantle.account.method.CreditCard'"/>
+            <if condition="!creditCard"><return error="true" message="Cannot not process payment [${paymentId}], not a Credit Card payment."/></if>
+            <set field="paymentMethod" from="payment.'mantle.account.method.PaymentMethod'"/>
+
+            <set field="postalAddress" from="paymentMethod.'mantle.party.contact.PostalAddress'"/>
+            <if condition="!postalAddress"><return error="true" message="Cannot not process payment [${paymentId}], no Address associated with Credit Card [${paymentId}]."/></if>
+            <set field="telecomNumber" from="paymentMethod.'mantle.party.contact.TelecomNumber'"/>
+            <set field="phone" from="(telecomNumber?.countryCode ? (telecomNumber.countryCode + '-') : '') + (telecomNumber?.areaCode ? (telecomNumber.areaCode + '-') : '') + telecomNumber?.contactNumber"/>
+            <set field="emailContactMech" from="paymentMethod.'Email#mantle.party.contact.ContactMech'"/>
+            <set field="visit" from="payment.'moqui.server.Visit'"/>
+
+            <!-- valid values for AIM are V (Visa), M (Master Card), A (AmEx), D (Discover), J (JCB), C (Diners Club);
+                all type values have "Cct" and the 4th character (index 3) matches this pattern for existing records -->
+            <set field="cardTypeCode" from="creditCard.creditCardTypeEnumId?.charAt(3)"/>
+            <!-- TODO, future: support x_method:'ECHECK' for BankAccount records -->
+            <set field="paymentInfoMap" from="[x_method:'CC',
+                    x_amount:toPlainString(payment.amount), x_currency_code:payment.amountUomId,
+                    x_card_num:creditCard.cardNumber, x_exp_date:creditCard.expireDate,
+                    x_card_code:creditCard.cardSecurityCode, x_card_type:cardTypeCode,
+                    x_first_name:paymentMethod.firstNameOnAccount, x_last_name:paymentMethod.lastNameOnAccount,
+                    x_company:paymentMethod.companyNameOnAccount,
+                    x_address:postalAddress.address1, x_city:postalAddress.city, x_state:postalAddress.stateProvinceGeoId,
+                    x_zip:postalAddress.postalCode, x_country:postalAddress.countryGeoId, x_phone:phone,
+                    x_email:emailContactMech?.infoString, x_cust_id:payment.fromPartyId, x_customer_ip:visit?.clientIpAddress,
+                    x_invoice_num:payment.orderId]"/>
+            <!-- TODO, future: maybe send x_description, x_po_num -->
+        </actions>
+    </service>
+    <service verb="get" noun="AuthGatewayInfo">
+        <in-parameters><parameter name="paymentId" required="true"/></in-parameters>
+        <out-parameters><parameter name="authInfoMap" type="Map"/></out-parameters>
+        <actions>
+            <log message="====Paypal get#AuthGatewayInfo"/>
+            <return/>
+            <service-call name="mantle.account.PaymentServices.get#AuthorizePaymentGatewayResponse" in-map="context" out-map="context"/>
+            <if condition="!paymentGatewayResponse"><return error="true" message="Could not find successful authorization for Payment ${paymentId}"/></if>
+
+            <set field="authInfoMap" from="[x_trans_id:paymentGatewayResponse.referenceNum,
+                    x_auth_code:paymentGatewayResponse.approvalCode]"/>
+        </actions>
+    </service>
+
+</services>

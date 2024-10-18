@@ -1,7 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <entity-facade-xml type="seed-initial">
     <moqui.basic.Enumeration description="Anonymous Party" enumId="PtyAnonymous" enumTypeId="PartyType"/>
-    <moqui.basic.StatusItem description="Unverified" sequenceNum="1" statusId="CS_UNVERIFIED" statusTypeId="CustomerStatus"/>
-    <moqui.basic.StatusItem description="Unverified" sequenceNum="2" statusId="CS_VERIFIED" statusTypeId="CustomerStatus"/>
+<!--    <moqui.basic.StatusItem description="Unverified" sequenceNum="1" statusId="CS_UNVERIFIED" statusTypeId="CustomerStatus"/>-->
+<!--    <moqui.basic.StatusItem description="Unverified" sequenceNum="2" statusId="CS_VERIFIED" statusTypeId="CustomerStatus"/>-->
 
+    <!--<moqui.basic.Enumeration description="Paypal Account" enumId="PgtPaypal" enumTypeId="PaymentGatewayType"/>-->
+    <mantle.account.method.PaymentGatewayConfig paymentGatewayConfigId="_PaypalGateway"
+                                                paymentGatewayTypeEnumId="PgtPayPal" description="Paypal"
+                                                authorizeServiceName="Paypal.PaymentServices.authorize#Payment"
+                                                captureServiceName="Paypal.PaymentServices.capture#Payment"
+                                                releaseServiceName="Paypal.PaymentServices.release#Payment"
+                                                refundServiceName="Paypal.PaymentServices.refund#Payment"/>
+
+<!--    <gleecy.foi.PaypalGatewayConfig-->
+<!--            paymentGatewayConfigId="PaypalGateway"-->
+<!--            appName="GleecyFO"-->
+<!--            transactionUrl="https://api-m.sandbox.paypal.com"-->
+<!--            apiVersion="v2"-->
+<!--            account="sb-5i47tl32233733@business.example.com"-->
+<!--            clientId="AcdrYvOADBR9Bxhr7BtOIRDwwfhEOLdMHvvt89lTqxGdx_n6t9r5HdU6O4jn4qv1aSX0azdbw6TJA9wO"-->
+<!--            secret="ECr-6YdahSV_lBrjy2j7AD9GdU2zx4t0QtZ6d4U8W2SY12ZJrRUOKekxXSxdfTZhXKOgruO6LCPzxp3N"/>-->
 </entity-facade-xml>

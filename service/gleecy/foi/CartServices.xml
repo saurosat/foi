@@ -42,8 +42,13 @@ General Order Placement and eCommerce Usage
             <parameter name="orderPart" type="Map"><auto-parameters entity-name="mantle.order.OrderPart"/></parameter>
             <parameter name="orderPromoCodeDetailList" type="List"><parameter name="orderPromoCode" type="Map"/></parameter>
 
-            <parameter name="orderItemList" type="List"><parameter name="orderItem" type="Map">
-                <auto-parameters entity-name="mantle.order.OrderItem"/></parameter></parameter>
+            <parameter name="orderItemList" type="List">
+                <parameter name="orderItem" type="Map">
+                    <auto-parameters entity-name="mantle.order.OrderItem"/>
+                    <parameter name="productName" />
+                    <parameter name="features" type="Map" />
+                </parameter>
+            </parameter>
             <parameter name="orderItemWithChildrenSet" type="Set"><parameter name="orderItemSeqId"/></parameter>
 
             <parameter name="paymentInfoList" type="List"><parameter name="partPaymentInfo" type="Map">
@@ -96,6 +101,60 @@ General Order Placement and eCommerce Usage
             <service-call name="gleecy.foi.CartServices.get#OrderInfoInternal" in-map="[orderId:orderId]" out-map="context"/>
         </actions>
     </service>
+    <service verb="get" noun="RelatedOrderItems">
+        <description>Internal service to get related order items of given OrderHeader</description>
+        <in-parameters>
+            <parameter name="orderHeader" type="EntityValue" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="orderItemList" type="List">
+                <parameter name="orderItem" type="Map">
+                    <auto-parameters entity-name="mantle.order.OrderItem"/>
+                    <parameter name="productName" />
+                    <parameter name="feature" type="Map" />
+                </parameter>
+            </parameter>
+            <parameter name="orderItemWithChildrenSet" type="Set"><parameter name="orderItemSeqId"/></parameter>
+        </out-parameters>
+        <actions>
+            <entity-find-related value-field="orderHeader" relationship-name="mantle.order.OrderItem"
+                                 list="eItemList" order-by-list="['orderItemSeqId']"/>
+            <script><![CDATA[
+                orderItemWithChildrenSet = new HashSet()
+                List reverseList = eItemList.cloneList().orderByFields(["-orderItemSeqId"])
+                for (orderItem in reverseList) {
+                    if (orderItem.parentItemSeqId) {
+                        orderItemWithChildrenSet.add(orderItem.parentItemSeqId)
+                        eItemList.move(eItemList.indexMatching([orderItemSeqId:orderItem.orderItemSeqId]),
+                                eItemList.indexMatching([orderItemSeqId:orderItem.parentItemSeqId])+1)
+                    }
+                }
+            ]]></script>
+
+            <set field="orderItemList" from="[]" />
+            <iterate list="eItemList" entry="eItem" >
+                <entity-find-one entity-name="mantle.product.Product" value-field="orderProduct" for-update="false" cache="true" auto-field-map="[productId:eItem.productId]" />
+                <entity-find entity-name="mantle.product.feature.ProductFeatureAppl" cache="true" for-update="false" list="appls">
+                    <econdition field-name="productId" from="eItem.productId" />
+                    <econdition field-name="applTypeEnumId" value="PfatDistinguishing" />
+                    <date-filter />
+                </entity-find>
+                <script><![CDATA[
+                    Map orderItem = eItem.getMap()
+                    orderItem.put("productPseudoId", orderProduct.pseudoId)
+                    orderItem.put("productName", orderProduct.productName)
+                    for(EntityValue appl in appls) {
+                        EntityValue eFeature = ec.entity.fastFindOne("mantle.product.feature.ProductFeature", true, false, appl.productFeatureId)
+                        Map feature = eFeature.getMap()
+                        EntityValue featureType = ec.entity.fastFindOne("moqui.basic.Enumeration", true, false, feature.productFeatureTypeEnumId)
+                        feature.put("featureTypeDescription", featureType.description)
+                        orderItem.put(featureType.enumId, feature)
+                    }
+                    orderItemList.add(orderItem)
+                ]]></script>
+            </iterate>
+        </actions>
+    </service>
     <service verb="get" noun="OrderInfoInternal">
         <description>Internal service to get order info (for cart or order history);
             get#CartInfo restricts to server side managed cartOrderId; get#OrderInfo restricts by active customerPartyId</description>
@@ -115,24 +174,51 @@ General Order Placement and eCommerce Usage
                 <econdition field-name="orderId"/></entity-find>
 
             <entity-find-related value-field="orderHeader" relationship-name="mantle.order.OrderItem"
-                    list="orderItemList" order-by-list="['orderItemSeqId']"/>
+                                 list="eItemList" order-by-list="['orderItemSeqId']"/>
             <script><![CDATA[
                 orderItemWithChildrenSet = new HashSet()
-                List reverseList = orderItemList.cloneList().orderByFields(["-orderItemSeqId"])
+                List reverseList = eItemList.cloneList().orderByFields(["-orderItemSeqId"])
                 for (orderItem in reverseList) {
                     if (orderItem.parentItemSeqId) {
                         orderItemWithChildrenSet.add(orderItem.parentItemSeqId)
-                        orderItemList.move(orderItemList.indexMatching([orderItemSeqId:orderItem.orderItemSeqId]),
-                                orderItemList.indexMatching([orderItemSeqId:orderItem.parentItemSeqId])+1)
+                        eItemList.move(eItemList.indexMatching([orderItemSeqId:orderItem.orderItemSeqId]),
+                                eItemList.indexMatching([orderItemSeqId:orderItem.parentItemSeqId])+1)
                     }
                 }
             ]]></script>
 
+            <set field="orderItemList" from="[]" />
+            <iterate list="eItemList" entry="eItem" >
+                <entity-find-one entity-name="mantle.product.Product" value-field="orderProduct" for-update="false" cache="true" auto-field-map="[productId:eItem.productId]" />
+                <entity-find entity-name="mantle.product.feature.ProductFeatureAppl" cache="true" for-update="false" list="appls">
+                    <econdition field-name="productId" from="eItem.productId" />
+                    <econdition field-name="applTypeEnumId" value="PfatDistinguishing" />
+                    <date-filter />
+                </entity-find>
+                <script><![CDATA[
+                    Map orderItem = eItem.getMap()
+                    orderItem.put("productPseudoId", orderProduct.pseudoId)
+                    orderItem.put("productName", orderProduct.productName)
+                    Map features = new HashMap()
+                    for(EntityValue appl in appls) {
+                        EntityValue eFeature = ec.entity.fastFindOne("mantle.product.feature.ProductFeature", true, false, appl.productFeatureId)
+                        Map feature = eFeature.getMap()
+                        EntityValue featureType = ec.entity.fastFindOne("moqui.basic.Enumeration", true, false, feature.productFeatureTypeEnumId)
+                        feature.put("featureTypeDescription", featureType.description)
+                        features.put(featureType.enumId, feature)
+                    }
+                    orderItem.put("features", features)
+                    orderItemList.add(orderItem)
+                ]]></script>
+            </iterate>
             <!-- get paymentList -->
             <entity-find-related value-field="orderHeader" relationship-name="mantle.account.payment.Payment"
                     list="paymentList" order-by-list="['paymentId']"/>
-            <set field="paymentList" from="paymentList.findAll{ it.method.paymentMethodTypeEnumId == 'PmtCreditCard'}"/>
-
+            <!--
+            Gleecy: Why is only CreditCard?
+            <set field="paymentList"
+                 from="paymentList.findAll{ it.method.paymentMethodTypeEnumId == 'PmtCreditCard'}"/>
+            -->
             <script><![CDATA[
                 import org.moqui.entity.EntityList
                 import org.moqui.entity.EntityValue
@@ -146,17 +232,19 @@ General Order Placement and eCommerce Usage
                     EntityValue paymentMethod = (EntityValue) payment.method
                     if (paymentMethod != null) {
                         paymentInfo.paymentMethod = paymentMethod
-                        creditCard = paymentMethod.creditCard
-                        paymentInfo.creditCard = creditCard.getMap().remove("cardNumber")
-                        paymentInfo.creditCardTypeEnum = creditCard?.type
-                        if (creditCard) {
-                            cardNumber = creditCard.cardNumber
-                            paymentInfo.maskedCardNumber = cardNumber ? '*'.padRight(cardNumber.length() - 4, '*') + cardNumber.substring(cardNumber.length() - 4, cardNumber.length()) : ''
-                        }
                         paymentInfo.postalAddress = paymentMethod.PostalAddress
                         paymentInfo.postalAddressStateGeo = paymentInfo.postalAddress?."StateProvince#moqui.basic.Geo"
                         paymentInfo.telecomNumber = paymentMethod.TelecomNumber
                         paymentInfo.paymentMethodTypeEnum = paymentMethod.methodType
+
+                        creditCard = paymentMethod.creditCard
+                        if (creditCard) {
+                            paymentInfo.creditCard = creditCard.getMap().remove("cardNumber")
+                            paymentInfo.creditCardTypeEnum = creditCard?.type
+                            cardNumber = creditCard.cardNumber
+                            paymentInfo.maskedCardNumber = cardNumber ? '*'.padRight(cardNumber.length() - 4, '*') + cardNumber.substring(cardNumber.length() - 4, cardNumber.length()) : ''
+                        }
+                        paymentInfo.payPalAccount = paymentMethod.payPalAccount
                     }
                     paymentInfo.paymentInstrumentEnum = payment.instrument
                     paymentInfoList.add(paymentInfo)
@@ -388,6 +476,165 @@ General Order Placement and eCommerce Usage
                     </script>-->
                 </if>
             </if>
+        </actions>
+    </service>
+    <service verb="checkout" noun="CartOrder">
+        <in-parameters>
+            <parameter name="paymentSource" required="true" />
+        </in-parameters>
+        <out-parameters>
+            <parameter name="paypalOrderId" />
+            <parameter name="paymentGatewayResponseId"/>
+            <parameter name="payment"/>
+        </out-parameters>
+        <actions>
+            <service-call name="gleecy.foi.CartServices.get#ActiveOrderAndCustomer" out-map="context"/>
+            <if condition="!cartOrderId"><return message="Cart is empty" public="true" type="warning"/></if>
+            <set field="orderId" from="cartOrderId"/>
+
+            <!-- TODO: check shipping and payment info -->
+            <entity-find-one entity-name="mantle.order.OrderHeader" value-field="orderHeader">
+                <field-map field-name="orderId"/>
+            </entity-find-one>
+            <if condition="!orderHeader" >
+                <log level="error" message="Cart ID ${cartOrderId} is not found" />
+                <return message="Cart ID ${cartOrderId} is not found" public="true" type="danger"/>
+            </if>
+            <entity-find-related value-field="orderHeader" relationship-name="parts" list="orderParts"/>
+<!--            <entity-find entity-name="mantle.order.OrderPart" list="orderPartList">-->
+<!--                <econdition field-name="orderId"/>-->
+<!--                <select-field field-name="orderPartSeqId"/>-->
+<!--                <order-by field-name="orderPartSeqId"/>-->
+<!--            </entity-find>-->
+            <set field="orderPart" from="orderParts.first" />
+            <set field="orderPartSeqId" from="orderPart.orderPartSeqId"/>
+
+            <entity-find entity-name="mantle.account.payment.Payment" list="paymentList">
+                <econdition field-name="orderId"/>
+                <econdition field-name="statusId" operator="not-in" value="PmntCancelled,PmntVoid,PmntDeclined"/>
+            </entity-find>
+            <if condition="paymentList.size() &gt; 1" >
+                <log level="error" message="More than 1 payments for single order " />
+                <return message="More than 1 payments for single order" public="true" type="danger"/>
+<!--                <iterate list="paymentList" entry="payment">-->
+<!--                    <if condition="partPayment.statusId in ['PmntProposed', 'PmntPromised']">-->
+<!--                        <then> <set field="payment" from="partPayment"/></then>-->
+<!--                        <else> <set field="amount" from="amount - (partPayment.amount ?: 0)"/></else>-->
+<!--                    </if>-->
+<!--                </iterate>-->
+            </if>
+            <set field="payment" from="paymentList?.first" />
+
+            <!-- 4. Create a Payment object and set payment in context -->
+            <if condition="!payment" >
+                <set field="toPartyId" from="orderPart.vendorPartyId" />
+                <if condition="!toPartyId">
+                    <entity-find-one entity-name="mantle.product.store.ProductStore" value-field="productStore" cache="true">
+                        <select-field field-name="organizationPartyId"/>
+                    </entity-find-one>
+                    <set field="toPartyId" from="productStore.organizationPartyId" />
+                </if>
+                <if condition="paymentSource == 'paypal' || paymentSource == 'card' || paymentSource.paypal || paymentSource.card" >
+                    <set field="paymentMethodTypeEnumId" value="PmtPayPalAccount" />
+                    <else><set field="paymentMethodTypeEnumId" value="PmtOther" /></else>
+                </if>
+                <entity-find entity-name="mantle.account.method.PaymentMethod" cache="true" list="paymentMethods">
+                    <econdition field-name="paymentMethodTypeEnumId" from="paymentMethodTypeEnumId" />
+                </entity-find>
+                <set field="toPaymentMethodId" from="paymentMethods?.first?.paymentMethodId" />
+
+                <service-call name="mantle.order.OrderServices.add#OrderPartPayment"
+                              in-map="context+[
+                                orderId:orderId,
+                                orderPartSeqId:orderPartSeqId,
+                                statusId: 'PmntProposed',
+                                toPaymentMethodId: toPaymentMethodId
+                                ]" out-map="context" />
+                <entity-find-one entity-name="mantle.account.payment.Payment" value-field="payment" for-update="true" />
+            </if>
+            <!-- 5. Request PayPal to create a PayPal Order and return payPalOrderId and payment -->
+            <if condition="payment.statusId in ['PmntProposed', 'PmntPromised']" ><then>
+                <if condition="paymentSource == 'paypal' || paymentSource == 'card' || paymentSource.paypal || paymentSource.card" >
+                    <then>
+<!--                        <set field="paymentSrcMap" from="[paypal:[:]]" /> paymentSource: paymentSrcMap,-->
+                        <service-call name="gleecy.foi.PayPalServices.submit#Payment" out-map="context"
+                                    in-map="context + [
+                                    path: '/v2/checkout/orders/',
+                                    intent: 'AUTHORIZE',
+                                    newStatus: 'PmntPromised',
+                                    payment: payment
+                                    ]"/>
+                    </then>
+                    <!-- TODO: support other payment methods:
+                    <else-if condition="OTHER PAYMENT METHOD"></else-if>
+                     -->
+                </if>
+            </then><else>
+                <set field="paypalOrderId" from="payment.paymentAuthCode" />
+            </else></if>
+        </actions>
+    </service>
+    <service verb="checkout" noun="OrderPart">
+        <in-parameters>
+            <parameter name="orderId" required="true" />
+            <parameter name="toPaymentMethodId" required="true" />
+            <parameter name="paymentMethodId" />
+            <parameter name="statusId" default-value="PmntProposed"/>
+            <parameter name="effectiveDate" type="Timestamp"><description>No default value, allow null until effectiveDate known, must be set before Delivered status</description></parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="payment" />
+            <parameter name="payPalOrderId" />
+        </out-parameters>
+        <actions>
+            <!-- 1. Get OrderPart from orderID -->
+            <entity-find-one entity-name="mantle.order.OrderPart" value-field="orderPart" />
+            <!-- 2. If Order information is not valid, return Error -->
+            <if condition="!orderPart">
+                <return error="true" type="info" message="Order ${orderId}, order part ${orderPartSeqId} is not found"/>
+            </if>
+            <if condition="orderPart.validThurDate.before(ec.user.nowTimeStamp)" >
+                <return error="true" type="info" message="Order ${orderId}, order part ${orderPartSeqId} is expired"/>
+            </if>
+            <if condition="!orderPart.customerPartyId || orderPart.vendorPartyId" >
+                <return error="true" type="info" message="Order ${orderId}, order part ${orderPartSeqId}: Customer and/or vendor information is missing."/>
+            </if>
+
+            <set field="amount" from="orderPart.partTotal" />
+            <!-- 3. Search for existing payment -->
+            <entity-find entity-name="mantle.account.payment.Payment" list="partPaymentList">
+                <econdition field-name="orderId"/>
+                <econdition field-name="orderPartSeqId"/>
+                <econdition field-name="statusId" operator="not-in" value="PmntCancelled,PmntVoid,PmntDeclined"/>
+            </entity-find>
+            <if condition="partPaymentList.size() &gt;= 1" >
+                <log level="warn" message="More than 1 payments for single order part" />
+                <iterate list="partPaymentList" entry="partPayment">
+                    <if condition="partPayment.statusId in ['PmntProposed', 'PmntPromised']">
+                        <then> <set field="payment" from="partPayment"/></then>
+                        <else> <set field="amount" from="amount - (partPayment.amount ?: 0)"/></else>
+                    </if>
+                </iterate>
+            </if>
+
+            <!-- 4. Create a Payment object and set payment in context -->
+            <if condition="!payment" >
+                <service-call name="mantle.account.PaymentServices.create#Payment" out-map="context"
+                              in-map="context + [
+                                paymentTypeEnumId: 'PtOrderPref',
+                                fromPartyId:orderPart.vendorPartyId,
+                                toPartyId:toPartyId.customerPartyId,
+                                statusId: 'PmntProposed',
+                                amount: amount
+                                ]" />
+                <entity-find-one entity-name="mantle.account.payment.Payment" value-field="payment" for-update="true" />
+            </if>
+            <!-- 5. Request PayPal to create a PayPal Order and return payPalOrderId and payment -->
+            <service-call name="gleecy.foi.PayPalServices.submit#Payment" out-map="context"
+                          in-map="context + [
+                path: '/v2/checkout/orders/',
+                intent: 'AUTHORIZE',
+                newStatus: 'PmntPromised']"/>
         </actions>
     </service>
 </services>
