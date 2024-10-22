@@ -13,9 +13,11 @@
             <parameter name="customerInfo" type="Map"/>
         </out-parameters>
         <actions>
-            <set field="loggedIn" from="partyId &amp;&amp; password &amp;&amp; ec.user.loginUser(partyId, password)" />
-            <if condition="!loggedIn" >
-                <set field="productStoreId" from="ec.web.request.getHeader('store')"/>
+            <if condition="!password">
+                <set field="password" from="ec.web.session.getAttribute('moqui.session.token') + 'P1!'" />
+            </if>
+            <if condition="!partyId" >
+                <set field="productStoreId" from="ec.web.request.getHeader('Store')"/>
                 <if condition="!productStoreId"><return message="Header parameter 'store' is missing" error="true" /> </if>
 
                 <entity-find-one entity-name="mantle.product.store.ProductStore" value-field="productStore" cache="true" for-update="false" />
@@ -24,26 +26,19 @@
                 <set field="ownerPartyId" from="productStore.organizationPartyId" type="String" />
 
                 <service-call name="create#mantle.party.Party" out-map="newPartyOut"
-                              in-map="[partyTypeEnumId:'PtyAnonymous', ownerPartyId:ownerPartyId, customerStatusId:'CS_UNVERIFIED']"/>
+                              in-map="[partyTypeEnumId:'PtyAnonymous', ownerPartyId:ownerPartyId]"/>
                 <set field="partyId" from="newPartyOut.partyId"/>
                 <service-call name="create#mantle.party.PartyRole" in-map="[partyId:partyId, roleTypeId:'Customer']"/>
 
-                <set field="password" from="productStore.secretKey" type="String" />
-                <script>
-                    import org.moqui.util.StringUtilities
-                    import org.apache.commons.lang3.StringUtils
-                    int hashVal = StringUtilities.hash(0, password)
-                    hashVal = StringUtilities.hash(hashVal, partyId)
-                    password = StringUtils.leftPad(Integer.toHexString(hashVal), 8, '~');
-                </script>
                 <service-call name="org.moqui.impl.UserServices.create#UserAccount"
-                              in-map="[userId:partyId, username:partyId, userFullName:'Anonymous', newPassword:password, newPasswordVerify:password]" out-map="newUaOut"/>
-                <script>ec.user.loginUser(partyId, password)</script>
+                              in-map="[partyId:partyId, username:partyId, userFullName:'Anonymous', newPassword:password, newPasswordVerify:password]" out-map="newUaOut"/>
             </if>
+            <log message="PartyId = ${partyId}" level="info" />
 
+            <script>ec.user.loginUser(partyId, password)</script>
             <service-call name="gleecy.foi.CustomerServices.postLogin#Customer" in-map="context" out-map="context"/>
             <!-- create the login key to return -->
-            <set field="apiKey" from="ec.user.getLoginKey()"/>
+            <!--<set field="apiKey" from="ec.user.getLoginKey()"/>-->
         </actions>
     </service>
     <!-- Login and Register for eCommerce -->
@@ -248,7 +243,7 @@
             <parameter name="customerInfo" type="Map"/>
         </out-parameters>
         <actions>
-            <set field="storeId" from="ec.web.request.getHeader('store')"/>
+            <set field="storeId" from="ec.web.request.getHeader('Store')"/>
             <script><![CDATA[
                 import org.moqui.impl.entity.EntityJavaUtil;
                 if(storeId != null && storeId.length > 9 && storeId.startsWith(EntityJavaUtil.TENANT_KEY_PREFIX)) {
@@ -310,7 +305,9 @@
 
             <!-- TODO: handle Organization type parties, use more liberal view-entity and support 'organizationName' instead of firstName/lastName in the UI -->
             <entity-find-one entity-name="mantle.party.PersonAndUserAccount" value-field="personAndUserAccount"/>
-            <script>context.putAll(personAndUserAccount)</script>
+            <if condition="personAndUserAccount" >
+                <script>context.putAll(personAndUserAccount)</script>
+            </if>
 
             <service-call name="mantle.party.ContactServices.get#PartyContactInfo" in-map="[partyId:partyId, telecomContactMechPurposeId: 'PhonePrimary', emailContactMechPurposeId:'EmailPrimary']" out-map="context"/>
         </actions>

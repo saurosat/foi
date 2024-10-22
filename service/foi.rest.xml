@@ -21,6 +21,8 @@ along with this software (see the LICENSE.md file). If not, see
     <!-- Login and Register -->
     <resource name="login" require-authentication="anonymous-all">
         <method type="post"><service name="gleecy.foi.CustomerServices.login#Customer"/></method></resource>
+    <resource name="loginAnonymous" require-authentication="anonymous-all">
+        <method type="post"><service name="gleecy.foi.CustomerServices.login#Anonymous"/></method></resource>
 <!-- This endpoint is DANGEROUS! don't use this until the service is fixed! -->
 <!--    <resource name="loginFB">-->
 <!--        <method type="post"><service name="gleecy.foi.CustomerServices.loginFB#Customer"/></method></resource>-->
