@@ -294,6 +294,7 @@
             <parameter name="firstName"/><parameter name="middleName"/><parameter name="lastName"/>
             <parameter name="locale"/><parameter name="timeZone"/><parameter name="disabled"/>
             <parameter name="emailAddress"/><parameter name="telecomNumber"/>
+            <parameter name="postalAddressList" type="List"/>
         </out-parameters>
         <actions>
             <!-- NOTE: use the web session for attributes such as customerPartyId for security; this won't work in a stateless mode or outside a web session -->
@@ -309,7 +310,9 @@
                 <script>context.putAll(personAndUserAccount)</script>
             </if>
 
-            <service-call name="mantle.party.ContactServices.get#PartyContactInfo" in-map="[partyId:partyId, telecomContactMechPurposeId: 'PhonePrimary', emailContactMechPurposeId:'EmailPrimary']" out-map="context"/>
+            <service-call name="mantle.party.ContactServices.get#PartyContactInfoList"
+                          in-map="[partyId:partyId, telecomContactMechPurposeId: 'PhonePrimary', emailContactMechPurposeId:'EmailPrimary', postalContactMechId:'PostalShippingDest']"
+                          out-map="context"/>
         </actions>
     </service>
 
@@ -418,10 +421,6 @@
             <set field="orderId" from="cartOrderId"/>
 
             <!-- if no customerPartyId call service to create one now and set in session (no user account aka 'anonymous') -->
-            <if condition="!customerPartyId">
-                <service-call name="gleecy.foi.CustomerServices.login#Anonymous" out-map="context"/>
-                <set field="customerPartyId" from="partyId" />
-            </if>
 
             <service-call name="mantle.account.PaymentMethodServices.store#PaymentMethodInfo" in-map="context" out-map="context"/>
 
@@ -468,8 +467,8 @@
             <parameter name="postalContactMechId"/>
             <parameter name="postalContactMechPurposeId" default-value="PostalShippingDest"/>
             <auto-parameters entity-name="mantle.party.contact.PostalAddress" include="nonpk"/>
-            <parameter name="address1" required="true"/>
-            <parameter name="postalCode" required="true"/>
+            <parameter name="address1"/>
+            <parameter name="postalCode"/>
 
             <parameter name="telecomContactMechId"/>
             <parameter name="telecomContactMechPurposeId"/>
@@ -496,10 +495,9 @@
             <set field="orderId" from="cartOrderId"/>
 
             <!-- if no customerPartyId call service to create one now and set in session (no user account aka 'anonymous') -->
-            <if condition="!customerPartyId">
-                <service-call name="gleecy.foi.CustomerServices.login#Anonymous" out-map="context"/>
-                <set field="customerPartyId" from="partyId" />
-            </if>
+<!--            <if condition="!customerPartyId">-->
+<!--                <service-call name="gleecy.foi.CustomerServices.login#Anonymous" out-map="context"/>-->
+<!--            </if>-->
 
             <service-call name="mantle.party.ContactServices.store#PartyContactInfo" in-map="context" out-map="context"/>
 

@@ -6,22 +6,47 @@
         </in-parameters>
         <out-parameters>
             <parameter name="token" type="String"/>
-            <parameter name="success" type="Boolean"/>
+            <parameter name="success" />
         </out-parameters>
     </service>
 
-    <service verb="submit" noun="Payment" type="java" location="io.gleecy.foi.service.PayPalServices" method="submitPayment">
+    <service verb="create" noun="Order" type="java" location="io.gleecy.foi.service.PayPalServices" method="createOrder">
         <in-parameters>
-            <parameter name="paymentId"/>
-            <parameter name="payment" type="EntityValue"/>
+            <parameter name="orderHeader" type="EntityValue" />
+            <parameter name="orderPart" type="EntityValue" />
+            <parameter name="orderParts" type="EntityValue" />
+            <parameter name="productStore" type="EntityValue" />
+            <parameter name="productStoreId"/>
+            <parameter name="paymentId" required="true"/>
             <parameter name="intent" required="true"/>
-            <parameter name="path" required="true"/>
-            <parameter name="newStatus" required="true"/>
+            <parameter name="paymentSource" required="true"/>
+            <parameter name="withAuthAssertion" />
+            <parameter name="paypalMerchantId" />
+            <parameter name="toPaymentMethodId" />
+            <parameter name="merchantPayPalAccount" type="EntityValue" />
         </in-parameters>
         <out-parameters>
+            <parameter name="success" />
+            <parameter name="message"/>
+            <parameter name="paymentStatus" />
             <parameter name="paypalOrderId" />
             <parameter name="paymentGatewayResponseId"/>
-            <parameter name="payment"/>
+        </out-parameters>
+    </service>
+    <service verb="submit" noun="Payment" type="java" location="io.gleecy.foi.service.PayPalServices" method="submitPayment">
+        <in-parameters>
+            <parameter name="paymentId" required="true"/>
+            <parameter name="operation" required="true"/>
+            <parameter name="paymentSource" type="Map"/>
+            <parameter name="amount" type="BigDecimal"/>
+            <parameter name="withAuthAssertion" />
+        </in-parameters>
+        <out-parameters>
+            <parameter name="success" />
+            <parameter name="message" type="String" />
+            <parameter name="paymentStatus" />
+            <parameter name="paypalOrderId" />
+            <parameter name="paymentGatewayResponseId"/>
         </out-parameters>
     </service>
 
@@ -37,6 +62,8 @@
         <out-parameters>
             <parameter name="payment" />
             <parameter name="payPalOrderId" />
+            <parameter name="success" />
+            <parameter name="message"/>
         </out-parameters>
         <actions>
             <!-- 1. Get OrderPart from orderID -->
@@ -90,70 +117,58 @@
                 payment: payment]"/>
         </actions>
     </service>
-    <service verb="authorize" noun="Payment">
+    <service verb="authorize" noun="Payment" >
         <implements service="mantle.account.PaymentServices.authorize#Payment"/>
+        <out-parameters>
+            <parameter name="success" />
+            <parameter name="message"/>
+        </out-parameters>
         <actions>
             <log message="====Paypal Authorize: $paymentGatewayConfigId"/>
-            <entity-find-one entity-name="mantle.account.payment.Payment" value-field="payment" />
             <service-call name="gleecy.foi.PayPalServices.submit#Payment" out-map="context"
-                          in-map="context + [
-                path: '/v2/checkout/orders/${payment.paymentRefNum}/authorize',
-                intent: 'AUTHORIZE',
-                payment: payment,
-                newStatus: 'PmntAuthorized']"/>
+                          in-map="context + [operation: 'AUTHORIZE']"/>
         </actions>
     </service>
 
     <service verb="capture" noun="Payment">
         <implements service="mantle.account.PaymentServices.capture#Payment"/>
+        <out-parameters>
+            <parameter name="success" />
+            <parameter name="message"/>
+        </out-parameters>
         <actions>
             <log message="====Paypal Capture $paymentGatewayConfigId "/>
-            <service-call name="gleecy.foi.PayPalServices.perform#PaypalApi" out-map="context"
-                          in-map="context + [
-                    path: '/v2/checkout/orders',
-                    intent: 'CAPTURE',
-                    paymentId: paymentId]"/>
+            <service-call name="gleecy.foi.PayPalServices.submit#Payment" out-map="context"
+                          in-map="context + [operation: 'CAPTURE']"/>
         </actions>
     </service>
 
     <service verb="release" noun="Payment">
         <implements service="mantle.account.PaymentServices.release#Payment"/>
+        <out-parameters>
+            <parameter name="success" />
+            <parameter name="message"/>
+        </out-parameters>
         <actions>
             <log message="===Paypal release"/>
-            <service-call name="gleecy.foi.PayPalServices.perform#PaypalApi" out-map="context"
-                          in-map="[
-                intent: 'RELEASE',
-                paymentId: paymentId]"/>
+            <service-call name="gleecy.foi.PayPalServices.submit#Payment" out-map="context"
+                          in-map="context + [operation: 'VOID']"/>
         </actions>
     </service>
 
     <service verb="refund" noun="Payment">
         <implements service="mantle.account.PaymentServices.refund#Payment"/>
+        <out-parameters>
+            <parameter name="success" />
+            <parameter name="message"/>
+        </out-parameters>
         <actions>
             <log message="====Paypal refund"/>
-            <service-call name="gleecy.foi.PayPalServices.perform#PaypalApi" out-map="context"
-                          in-map="[
-                intent: 'REFUND',
-                paymentId: paymentId]"/>
+            <service-call name="gleecy.foi.PayPalServices.submit#Payment" out-map="context"
+                          in-map="context + [operation: 'REFUND']"/>
         </actions>
     </service>
 
-    <service verb="get" noun="GatewayInfo">
-        <in-parameters><parameter name="paymentGatewayConfigId" required="true"/></in-parameters>
-        <out-parameters><parameter name="gatewayInfoMap" type="Map"/></out-parameters>
-        <actions>
-            <log message="====paypal get#GatewayInfo"/>
-            <return/>
-
-            <entity-find-one entity-name="Paypal.PaymentGatewayPaypal" value-field="pgan"/>
-            <set field="gatewayInfoMap" from="[x_login:pgan.login, x_tran_key:pgan.tranKey,
-                    x_version:pgan.apiVersion, x_duplicate_window:pgan.duplicateWindow,
-                    x_test_request:pgan.testRequest, x_delim_data:'TRUE', x_delim_char:'|', x_relay_response:'FALSE',
-                    x_email_customer:pgan.emailCustomer, x_email_merchant:pgan.emailMerchant]"/>
-            <!-- NOTE: not setting x_encap_char, should not be needed with pipe delimeter -->
-            <!-- handle these later: x_cpversion:pgan.cpVersion, x_market_type:pgan.cpMarketType, x_device_type:pgan.cpDeviceType,  -->
-        </actions>
-    </service>
     <service verb="get" noun="PaymentGatewayInfo">
         <in-parameters><parameter name="paymentId" required="true"/></in-parameters>
         <out-parameters><parameter name="paymentInfoMap" type="Map"/></out-parameters>

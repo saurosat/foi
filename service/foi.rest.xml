@@ -26,7 +26,7 @@ along with this software (see the LICENSE.md file). If not, see
 <!-- This endpoint is DANGEROUS! don't use this until the service is fixed! -->
 <!--    <resource name="loginFB">-->
 <!--        <method type="post"><service name="gleecy.foi.CustomerServices.loginFB#Customer"/></method></resource>-->
-    <resource name="logout">
+    <resource name="logout" require-authentication="anonymous-view">
         <method type="get"><service name="gleecy.foi.CustomerServices.logout#Customer"/></method></resource>
     <resource name="register">
         <method type="post"><service name="gleecy.foi.CustomerServices.register#Customer"/></method></resource>

@@ -8,6 +8,22 @@
         <field name="notificationUrl" type="text-medium" />
 <!--        <field name="subscribedEntities" type="text-intermediate" />-->
     </extend-entity>
+    <entity entity-name="PayPalGatewayConfig" package="mantle.account.method" >
+        <field name="paymentGatewayConfigId" type="id" is-pk="true"/>
+        <field name="appName" type="text-short" />
+        <field name="apiVersion" type="text-short" />
+        <field name="transactionUrl" type="text-medium"><description>Transaction URL</description></field>
+        <field name="accountId" type="text-medium" />
+        <field name="clientId" type="text-medium" />
+        <field name="secret" type="text-medium" />
+        <field name="authToken" type="text-intermediate"><description>Store this token to avoid keeping sensitive data clientId and secret in DB</description> </field>
+        <field name="bearerToken" type="text-intermediate" />
+        <field name="expiryDate" type="date-time"><description>When the current bearer token is going to expire</description></field>
+        <relationship type="one" related="mantle.account.method.PaymentGatewayConfig"/>
+    </entity>
+    <extend-entity entity-name="Payment" package="mantle.account.payment">
+        <field name="facilitatorAccessToken" type="text-medium" />
+    </extend-entity>
     <view-entity entity-name="StoreViewableCategories" package="mantle.product.store">
         <member-entity entity-alias="ps" entity-name="mantle.product.store.ProductStore" />
         <member-relationship entity-alias="psc" join-from-alias="ps" relationship="categories" />
@@ -37,4 +53,44 @@
         <alias name="productId" field="productId" entity-alias="pcm" />
         <alias name="pcmFromDate" field="fromDate" entity-alias="pcm" />
     </view-entity>
+
+    <view-entity entity-name="PaymentMethodPayPal" package="mantle.account.method">
+        <member-entity entity-alias="PMD" entity-name="mantle.account.method.PaymentMethod"/>
+        <member-relationship entity-alias="PMPP" join-from-alias="PMD" relationship="payPalAccount"/>
+        <alias-all entity-alias="PMPP"/>
+        <alias name="partyId" entity-alias="PMD" field="ownerPartyId"/>
+        <alias name="fromDate" entity-alias="PMD" field="fromDate"/>
+        <alias name="thruDate" entity-alias="PMD" field="thruDate"/>
+        <alias name="postalContactMechId" entity-alias="PMD" field="postalContactMechId"/>
+        <alias name="telecomContactMechId" entity-alias="PMD" field="telecomContactMechId"/>
+        <alias name="emailContactMechId" entity-alias="PMD" field="emailContactMechId"/>
+        <alias name="paymentGatewayConfigId" entity-alias="PMD" field="paymentGatewayConfigId"/>
+        <alias name="currencyUomId" entity-alias="PMD" field="currencyUomId"/>
+        <alias name="titleOnAccount" entity-alias="PMD" field="titleOnAccount"/>
+        <alias name="firstNameOnAccount" entity-alias="PMD" field="firstNameOnAccount"/>
+        <alias name="middleNameOnAccount" entity-alias="PMD" field="middleNameOnAccount"/>
+        <alias name="lastNameOnAccount" entity-alias="PMD" field="lastNameOnAccount"/>
+        <alias name="suffixOnAccount" entity-alias="PMD" field="suffixOnAccount"/>
+        <alias name="companyNameOnAccount" entity-alias="PMD" field="companyNameOnAccount"/>
+    </view-entity>
+    <view-entity entity-name="PaymentMethodCreditCard" package="mantle.account.method">
+        <member-entity entity-alias="PMD" entity-name="mantle.account.method.PaymentMethod"/>
+        <member-relationship entity-alias="PMCC" join-from-alias="PMD" relationship="creditCard"/>
+        <alias-all entity-alias="PMCC"/>
+        <alias name="partyId" entity-alias="PMD" field="ownerPartyId"/>
+        <alias name="fromDate" entity-alias="PMD" field="fromDate"/>
+        <alias name="thruDate" entity-alias="PMD" field="thruDate"/>
+        <alias name="postalContactMechId" entity-alias="PMD" field="postalContactMechId"/>
+        <alias name="telecomContactMechId" entity-alias="PMD" field="telecomContactMechId"/>
+        <alias name="emailContactMechId" entity-alias="PMD" field="emailContactMechId"/>
+        <alias name="paymentGatewayConfigId" entity-alias="PMD" field="paymentGatewayConfigId"/>
+        <alias name="currencyUomId" entity-alias="PMD" field="currencyUomId"/>
+        <alias name="titleOnAccount" entity-alias="PMD" field="titleOnAccount"/>
+        <alias name="firstNameOnAccount" entity-alias="PMD" field="firstNameOnAccount"/>
+        <alias name="middleNameOnAccount" entity-alias="PMD" field="middleNameOnAccount"/>
+        <alias name="lastNameOnAccount" entity-alias="PMD" field="lastNameOnAccount"/>
+        <alias name="suffixOnAccount" entity-alias="PMD" field="suffixOnAccount"/>
+        <alias name="companyNameOnAccount" entity-alias="PMD" field="companyNameOnAccount"/>
+    </view-entity>
+
 </entities>
