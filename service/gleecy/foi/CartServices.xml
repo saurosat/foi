@@ -415,7 +415,8 @@ General Order Placement and eCommerce Usage
             <if condition="!cartOrderId"><return message="Cart is empty" public="true" type="warning"/></if>
             <set field="orderId" from="cartOrderId"/>
             <set field="partyId" from="customerPartyId"/>
-            <if condition="paymentSource == 'paypal' || paymentSource.paypal" >
+<!--            <if condition="paymentSource == 'paypal'" >-->
+            <if condition="paymentSource" >
                 <then>
                     <set field="paymentMethodTypeEnumId" value="PmtPayPalAccount" />
                     <set field="paymentInstrumentEnumId" value="PiPayPalAccount" />
@@ -435,25 +436,25 @@ General Order Placement and eCommerce Usage
                         </else>
                     </if>
                 </then>
-                <else-if condition="paymentSource == 'card' || paymentSource.card" >
-                    <set field="paymentMethodTypeEnumId" value="PmtCreditCard" />
-                    <set field="paymentInstrumentEnumId" value="PiPayPalAccount" />
-                    <set field="isPayPal" from="true" />
-                    <entity-find entity-name="mantle.account.method.PaymentMethodCreditCard"
-                                 for-update="false" cache="true" list="creditCards">
-                        <econdition field-name="partyId" from="customerPartyId" />
-                        <econdition field-name="cardNumber" />
-                        <date-filter />
-                    </entity-find>
-                    <set field="customerAccount" from="creditCards?.first" />
-                    <if condition="!customerAccount">
-                        <service-call name="mantle.account.PaymentMethodServices.create#cardNumber" out-map="context"
-                                      in-map="context + [ownerPartyId:partyId]"/>
-                        <else>
-                            <set field="paymentMethodId" from="customerAccount?.paymentMethodId" />
-                        </else>
-                    </if>
-                </else-if>
+<!--                <else-if condition="paymentSource == 'card'" >-->
+<!--                    <set field="paymentMethodTypeEnumId" value="PmtCreditCard" />-->
+<!--                    <set field="paymentInstrumentEnumId" value="PiPayPalAccount" />-->
+<!--                    <set field="isPayPal" from="true" />-->
+<!--                    <entity-find entity-name="mantle.account.method.PaymentMethodCreditCard"-->
+<!--                                 for-update="false" cache="true" list="creditCards">-->
+<!--                        <econdition field-name="partyId" from="customerPartyId" />-->
+<!--                        <econdition field-name="cardNumber" />-->
+<!--                        <date-filter />-->
+<!--                    </entity-find>-->
+<!--                    <set field="customerAccount" from="creditCards?.first" />-->
+<!--                    <if condition="!customerAccount">-->
+<!--                        <service-call name="mantle.account.PaymentMethodServices.create#CreditCard" out-map="context"-->
+<!--                                      in-map="context + [ownerPartyId:partyId]"/>-->
+<!--                        <else>-->
+<!--                            <set field="paymentMethodId" from="customerAccount?.paymentMethodId" />-->
+<!--                        </else>-->
+<!--                    </if>-->
+<!--                </else-if>-->
             </if>
             <entity-find entity-name="mantle.account.payment.Payment" list="paymentList">
                 <econdition field-name="orderId"/>
@@ -572,17 +573,18 @@ General Order Placement and eCommerce Usage
                 <return message="Cart ID ${cartOrderId} is not found" public="true" type="danger"/>
             </if>
 
-            <if condition="paymentSource == 'paypal' || paymentSource.paypal" >
+<!--            <if condition="paymentSource == 'paypal' || paymentSource == 'card'" >-->
+            <if condition="paymentSource" >
                 <then>
                     <set field="paymentMethodTypeEnumId" value="PmtPayPalAccount" />
                     <set field="paymentInstrumentEnumId" value="PiPayPalAccount" />
                     <set field="isPayPal" from="true" />
                 </then>
-                <else-if condition="paymentSource == 'card' || paymentSource.card" >
-                    <set field="paymentMethodTypeEnumId" value="PmtCreditCard" />
-                    <set field="paymentInstrumentEnumId" value="PiPayPalAccount" />
-                    <set field="isPayPal" from="true" />
-                </else-if>
+<!--                <else-if condition="paymentSource == 'card'" >-->
+<!--                    <set field="paymentMethodTypeEnumId" value="PmtCreditCard" />-->
+<!--                    <set field="paymentInstrumentEnumId" value="PiPayPalAccount" />-->
+<!--                    <set field="isPayPal" from="true" />-->
+<!--                </else-if>-->
             </if>
 
             <entity-find-related value-field="orderHeader" relationship-name="parts" list="orderParts" for-update="false" cache="true"/>
