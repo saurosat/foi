@@ -9,6 +9,7 @@
 
     <moqui.basic.Enumeration description="Anonymous Party" enumId="PtyAnonymous" enumTypeId="PartyType"/>
     <moqui.basic.Enumeration description="Create Order" enumId="PgoCreateOrder" enumTypeId="PaymentOperation"/>
+    <moqui.basic.Enumeration description="Paypal" enumId="PgtPayPal" enumTypeId="PaymentGatewayType"/>
 
     <!--    <moqui.basic.StatusItem description="Unverified" sequenceNum="1" statusId="CS_UNVERIFIED" statusTypeId="CustomerStatus"/>-->
 <!--    <moqui.basic.StatusItem description="Unverified" sequenceNum="2" statusId="CS_VERIFIED" statusTypeId="CustomerStatus"/>-->

@@ -8,6 +8,9 @@
         <field name="notificationUrl" type="text-medium" />
 <!--        <field name="subscribedEntities" type="text-intermediate" />-->
     </extend-entity>
+    <extend-entity entity-name="PayPalAccount" package="mantle.account.method">
+        <field name="expressCheckoutToken" type="text-intermediate"/>
+    </extend-entity>
     <entity entity-name="PayPalGatewayConfig" package="mantle.account.method" >
         <field name="paymentGatewayConfigId" type="id" is-pk="true"/>
         <field name="appName" type="text-short" />
