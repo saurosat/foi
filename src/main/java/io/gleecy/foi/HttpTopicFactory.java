@@ -70,7 +70,7 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
         ClientConnectionFactory.Info h2 = new ClientConnectionFactoryOverHTTP2.HTTP2(http2Client);
 
         // Create the HttpClientTransportDynamic, preferring h2 over h1.
-        HttpClientTransport transport = new HttpClientTransportDynamic(clientConnector, h2, h1);
+        HttpClientTransport transport = new HttpClientTransportDynamic(clientConnector, h1, h2);
         transport.setConnectionPoolFactory(destination ->
                 new MultiplexConnectionPool(destination, Pool.StrategyType.THREAD_ID, 10,true, destination, 1));
 
