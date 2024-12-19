@@ -311,7 +311,7 @@
             </if>
 
             <service-call name="mantle.party.ContactServices.get#PartyContactInfoList"
-                          in-map="[partyId:partyId, telecomContactMechPurposeId: 'PhonePrimary', emailContactMechPurposeId:'EmailPrimary', postalContactMechId:'PostalShippingDest']"
+                          in-map="[partyId:partyId, telecomContactMechPurposeId: 'PhonePrimary', emailContactMechPurposeId:'EmailPrimary', postalContactMechPurposeId:'PostalShippingDest', alsoIncludePrimaryPurpose:true]"
                           out-map="context"/>
         </actions>
     </service>
