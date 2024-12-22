@@ -48,7 +48,7 @@
         <member-entity entity-alias="pcm" entity-name="mantle.product.category.ProductCategoryMember" join-from-alias="psc">
             <key-map field-name="productCategoryId" related="productCategoryId" />
         </member-entity>
-        <member-relationship entity-alias="p" join-from-alias="pcm" relationship="product" />
+        <!--<member-relationship entity-alias="p" join-from-alias="pcm" relationship="product" /> Not used -->
         <alias name="productStoreId" field="productStoreId" entity-alias="ps" />
         <alias name="productCategoryId" field="productCategoryId" entity-alias="psc" />
         <alias name="storeCategoryTypeEnumId" field="storeCategoryTypeEnumId" entity-alias="psc" />
