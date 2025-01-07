@@ -290,11 +290,9 @@ General Order Placement and eCommerce Usage
     <service verb="add" noun="Product" >
         <implements service="gleecy.foi.CartServices.get#CartInfo"/>
         <in-parameters>
-            <parameter name="productStoreId" required="true"/>
             <parameter name="productId" required="true"/>
             <parameter name="quantity" type="BigDecimal" default="1.0"/>
             <parameter name="currencyUomId"/>
-            <parameter name="productStoreId"/>
         </in-parameters>
         <actions>
             <!-- NOTE: use the web session for attributes such as cartOrderId for security; this won't work in a stateless mode or outside a web session -->
@@ -302,6 +300,9 @@ General Order Placement and eCommerce Usage
             <set field="shipmentMethodEnumId" from="'ShMthGround'"/>
 
             <service-call name="gleecy.foi.CartServices.get#ActiveOrderAndCustomer" out-map="context"/>
+            <!--
+                Above call return productStoreId, cartOrderId and customerPartyId
+             -->
             <set field="orderId" from="cartOrderId"/>
             <set field="defaultOrderParameters" from="[salesChannelEnumId:'ScWeb']" />
             <service-call name="mantle.order.OrderServices.add#OrderProductQuantity" in-map="context + defaultOrderParameters" out-map="addOut"/>
