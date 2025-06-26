@@ -7,4 +7,15 @@
         <tool-factory class="io.gleecy.foi.HttpTopicFactory" init-priority="20" disabled="false"/>
         <tool-factory class="io.gleecy.foi.tool.paypal.PPClientConfigFactory" init-priority="20" disabled="false"/>
     </tools>
+    <screen-facade>
+        <screen location="component://SimpleScreens/screen/SimpleScreens/Catalog/Product.xml">
+            <subscreens-item name="L10n" menu-title="Localization" menu-index="2"
+                             location="component://foi/screen/gleecy/l10n/Products.xml" />
+        </screen>
+        <screen location="component://SimpleScreens/screen/SimpleScreens/Catalog/Category.xml">
+            <subscreens-item name="L10n" menu-title="Localization" menu-index="2"
+                             location="component://foi/screen/gleecy/l10n/Categories.xml" />
+        </screen>
+    </screen-facade>
+
 </moqui-conf>

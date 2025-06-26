@@ -3,11 +3,14 @@ package io.gleecy.foi;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.api.Result;
+import org.moqui.Moqui;
 import org.moqui.context.ExecutionContext;
 import org.moqui.context.ToolFactory;
+import org.moqui.entity.EntityException;
 import org.moqui.entity.EntityFind;
 import org.moqui.entity.EntityList;
 import org.moqui.entity.EntityValue;
+import org.moqui.impl.context.ExecutionContextFactoryImpl;
 import org.moqui.impl.entity.EntityDefinition;
 import org.moqui.impl.entity.EntityFacadeImpl;
 import org.moqui.impl.entity.EntityValueBase;
@@ -69,8 +72,20 @@ public class EntityTopic implements HttpTopic {
                             "productId", ev.remove("productId"),
                             ev.remove("pricePurposeEnumId") + ev.remove("priceTypeEnumId") + "Price",
                             ev.remove("price") + " " + ev.remove("priceUomId")
-                    )
+                    ),
+                    "LocalizedEntityField", (ev) -> {
+                        String entityName = ev.remove("entityName");
+
+                        int lastDotIdx = entityName.lastIndexOf('.');
+                        return Map.of("entityName", entityName.substring(lastDotIdx + 1),
+                                    ev.remove("fieldName") + "." + ev.remove("locale"), ev.remove("localized"));
+                    }
             );
+    private static EntityFacadeImpl getEntityFacadeImpl() {
+        ExecutionContextFactoryImpl ecfi = (ExecutionContextFactoryImpl) Moqui.getExecutionContextFactory();
+        if (ecfi == null) throw new EntityException("No ExecutionContextFactory found" );
+        return ecfi.entityFacade;
+    }
     private static void logResponse(Result result) {
         Request req = result.getRequest();
         if(result.isSucceeded()) {

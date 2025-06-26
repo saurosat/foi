@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+    <service verb="delete" noun="ProductL10nData">
+        <in-parameters>
+            <parameter name="productId" />
+            <parameter name="locale" />
+        </in-parameters>
+        <actions>
+            <entity-delete-by-condition entity-name="moqui.basic.LocalizedEntityField">
+                <econdition field-name="entityName" value="mantle.product.Product" />
+                <econdition field-name="locale" from="locale" />
+                <econdition field-name="pkValue" from="productId" />
+            </entity-delete-by-condition>
+        </actions>
+    </service>
+    <service verb="delete" noun="CategoryL10nData">
+        <in-parameters>
+            <parameter name="productCategoryId" />
+            <parameter name="locale" />
+        </in-parameters>
+        <actions>
+            <entity-delete-by-condition entity-name="moqui.basic.LocalizedEntityField">
+                <econdition field-name="entityName" value="mantle.product.category.ProductCategory" />
+                <econdition field-name="locale" from="locale" />
+                <econdition field-name="pkValue" from="productCategoryId" />
+            </entity-delete-by-condition>
+        </actions>
+    </service>
+    <service verb="save" noun="LocalizedEntityField" >
+        <in-parameters>
+            <auto-parameters />
+        </in-parameters>
+        <actions>
+            <entity-find-one entity-name="moqui.basic.LocalizedEntityField" value-field="locEntity" for-update="true" />
+            <if condition="locEntity" >
+                <then>
+                    <entity-set value-field="locEntity" map="[localized:localized]" />
+                    <entity-update value-field="locEntity"/>
+                </then>
+                <else>
+                    <entity-make-value entity-name="moqui.basic.LocalizedEntityField" value-field="locEntity" map="context" />
+                    <entity-create value-field="locEntity"/>
+                </else>
+            </if>
+
+        </actions>
+    </service>
+    <service verb="save" noun="ProductL10nData">
+        <in-parameters>
+            <parameter name="productId" />
+            <parameter name="locale" />
+            <parameter name="productName" />
+            <parameter name="description" />
+        </in-parameters>
+        <actions>
+            <entity-find-one entity-name="mantle.product.Product" value-field="product" for-update="true" />
+            <if condition="product">
+                <if condition="locale == 'en'" >
+                    <then>
+                        <entity-set value-field="product" map="[productName:productName, description:description]"/>
+                        <entity-update value-field="product"/>
+                    </then>
+                    <else>
+                        <if condition="description != product.description">
+                            <service-call name="gleecy.foi.L10nServices.save#LocalizedEntityField" disable-authz="true"
+                                          in-map="[entityName:'mantle.product.Product', locale:locale, pkValue:productId, fieldName:'description', localized:description]" />
+                        </if>
+                        <if condition="productName != product.productName">
+                            <service-call name="gleecy.foi.L10nServices.save#LocalizedEntityField" disable-authz="true"
+                                      in-map="[entityName:'mantle.product.Product', locale:locale, pkValue:productId, fieldName:'productName', localized:productName]" />
+                        </if>
+                    </else>
+                </if>
+            </if>
+        </actions>
+    </service>
+    <service verb="save" noun="CategoryL10nData">
+        <in-parameters>
+            <parameter name="productCategoryId" />
+            <parameter name="locale" />
+            <parameter name="categoryName" />
+            <parameter name="description" />
+        </in-parameters>
+        <actions>
+            <if condition="locale == 'en'" >
+                <then>
+                    <entity-find-one entity-name="mantle.product.category.ProductCategory" value-field="category" for-update="true" />
+                    <if condition="category">
+                        <entity-set value-field="category" map="[categoryName:categoryName, description:description]"/>
+                        <entity-update value-field="category"/>
+                    </if>
+                </then>
+                <else>
+                    <service-call name="gleecy.foi.L10nServices.save#LocalizedEntityField" disable-authz="true"
+                                  in-map="[entityName:'mantle.product.category.ProductCategory', locale:locale, pkValue:productCategoryId, fieldName:'description', localized:description]" />
+                    <service-call name="gleecy.foi.L10nServices.save#LocalizedEntityField" disable-authz="true"
+                                  in-map="[entityName:'mantle.product.category.ProductCategory', locale:locale, pkValue:productCategoryId, fieldName:'categoryName', localized:categoryName]" />
+                </else>
+            </if>
+        </actions>
+    </service>
+</services>

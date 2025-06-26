@@ -28,6 +28,16 @@
             </if>
         </actions>
     </service>
+    <!-- TODO: working on Jun 4: -->
+    <service verb="publish" noun="L10nCategory">
+        <in-parameters>
+            <parameter name="entityValue" required="true" type = "org.moqui.entity.EntityValue" />
+            <parameter name="eecaOperation" required="true" type="String"/>
+        </in-parameters>
+        <actions>
+            <!-- TODO -->
+        </actions>
+    </service>
     <service verb="publish" noun="CategoryAndDependencies">
         <in-parameters>
             <parameter name="entityValue" required="true" type = "org.moqui.entity.EntityValue" />
