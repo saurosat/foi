@@ -8,6 +8,7 @@ import org.eclipse.jetty.client.http.HttpClientConnectionFactory;
 import org.eclipse.jetty.http2.client.HTTP2Client;
 import org.eclipse.jetty.io.ClientConnectionFactory;
 import org.eclipse.jetty.io.ClientConnector;
+import org.eclipse.jetty.util.Callback;
 import org.eclipse.jetty.util.Pool;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
@@ -53,12 +54,14 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
         QueuedThreadPool threadPool = new QueuedThreadPool();
         threadPool.setName("httpTopicPublisher");
         threadPool.setMaxThreads(10);
+        threadPool.setIdleTimeout(1000);
 
         ClientConnector clientConnector = new ClientConnector();
-        //clientConnector.setExecutor(threadPool);
+        clientConnector.setExecutor(threadPool);
         clientConnector.setSslContextFactory(sslContextFactory);
         clientConnector.setReuseAddress(true);
         clientConnector.setReusePort(true);
+
 
         //ClientConnectionFactoryO
         // Prepare the application protocols.
@@ -66,23 +69,27 @@ public class HttpTopicFactory implements ToolFactory<HttpTopic> {
 
         HTTP2Client http2Client = new HTTP2Client(clientConnector);
         http2Client.setMaxConcurrentPushedStreams(128);
+        http2Client.setUseInputDirectByteBuffers(false);
+        http2Client.setUseOutputDirectByteBuffers(false);
 
         ClientConnectionFactory.Info h2 = new ClientConnectionFactoryOverHTTP2.HTTP2(http2Client);
 
+        Callback requester = Callback.from(new Callback.Completable());
         // Create the HttpClientTransportDynamic, preferring h2 over h1.
         HttpClientTransport transport = new HttpClientTransportDynamic(clientConnector, h1, h2);
         transport.setConnectionPoolFactory(destination ->
-                new MultiplexConnectionPool(destination, Pool.StrategyType.THREAD_ID, 10,true, destination, 1));
+                new MultiplexConnectionPool(destination, Pool.StrategyType.THREAD_ID, 10,false, requester, 1));
 
 
         this.httpClient = new HttpClient(transport);
         httpClient.setFollowRedirects(false);
         httpClient.setMaxConnectionsPerDestination(10);
-        httpClient.setExecutor(threadPool);
-        httpClient.setRequestBufferSize(50000000);
+        httpClient.setUseInputDirectByteBuffers(false);
+        httpClient.setUseOutputDirectByteBuffers(false);
         httpClient.setMaxRequestsQueuedPerDestination(2000);
         httpClient.setMaxConnectionsPerDestination(10);
-
+        httpClient.setIdleTimeout(5000);
+        //httpClient.setB
         try {
             httpClient.start();
             httpClient.getContentDecoderFactories().clear();

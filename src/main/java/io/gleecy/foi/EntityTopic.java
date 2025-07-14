@@ -88,6 +88,7 @@ public class EntityTopic implements HttpTopic {
         if(err != null) {
             logError.append("\n Request Error: ").append(err.getMessage());
             logger.error(logError.toString());
+            err.printStackTrace();
             return;
         }
 

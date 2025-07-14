@@ -3,6 +3,9 @@
     <extend-entity entity-name="ProductFeature" package="mantle.product.feature" >
         <field name="noImageDiff" type="text-indicator" default="N" />
     </extend-entity>
+    <extend-entity entity-name="ProductCategory" package="mantle.product.category">
+        <field name="hrefDemo" type="text-intermediate"/>
+    </extend-entity>
     <extend-entity entity-name="ProductStore" package="mantle.product.store">
         <field name="secretKey" type="text-short" />
         <field name="notificationUrl" type="text-medium" />

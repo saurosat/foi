@@ -7,6 +7,8 @@
     <moqui.security.ArtifactAuthz artifactAuthzId="FOI_REST_API_ALL" userGroupId="ALL_USERS" artifactGroupId="FOI_REST_API"
                                   authzTypeEnumId="AUTHZT_ALWAYS" authzActionEnumId="AUTHZA_ALL"/>
 
+    <moqui.basic.Enumeration description="Service" enumId="PctService" enumTypeId="ProductCategoryType"/>
+
     <moqui.basic.Enumeration description="Anonymous Party" enumId="PtyAnonymous" enumTypeId="PartyType"/>
     <moqui.basic.Enumeration description="Create Order" enumId="PgoCreateOrder" enumTypeId="PaymentOperation"/>
     <moqui.basic.Enumeration description="Paypal" enumId="PgtPayPal" enumTypeId="PaymentGatewayType"/>

@@ -72,7 +72,7 @@
             <set field="productStoreId" value="${entityValue.getNoCheckSimple('productStoreId')}" type="String"/>
             <set field="productCategoryId" value="${entityValue.getNoCheckSimple('productCategoryId')}" type="String"/>
             <service-call name="gleecy.foi.NotificationServices.publish#CategoryIdAndDependencies" async="false"
-                          in-map="[eecaOperation: 'update', productStoreId:productStoreId, productCategoryId:productCategoryId]" />
+                          in-map="[eecaOperation: eecaOperation, productStoreId:productStoreId, productCategoryId:productCategoryId]" />
             <service-call name="gleecy.foi.NotificationServices.publish#EntityTopic"
                           in-map="context + [productStoreId: productStoreId, productCategoryId: productCategoryId]" />
         </actions>
