@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-3.xsd"
+        default-menu-title="Categories' Localization" default-menu-index="2">
+    <parameter name="pseudoId" required="false" />
+    <parameter name="categoryName" required="false" />
+    <transition name="saveL10nData">
+        <parameter name="qPseudo" required="false" />
+        <parameter name="qName" required="false" />
+        <service-call name="gleecy.foi.L10nServices.save#CategoryL10nData"/>
+        <default-response url="." parameter-map="[pseudoId:qPseudo, categoryName:qName]"/>
+    </transition>
+    <transition name="deleteL10nData">
+        <parameter name="qPseudo" required="false" />
+        <parameter name="qName" required="false" />
+        <service-call name="gleecy.foi.L10nServices.delete#CategoryL10nData" />
+        <default-response url="." parameter-map="[pseudoId:qPseudo, categoryName:qName]"/>
+    </transition>
+
+    <actions>
+        <set field="locales" from="['', 'ar','az','bg','bn_BD','ca','cs','da','de','el','en','es_AR','es','es_PE',
+                    'et','eu','fa','fi','fr','ge','gl','he','hr','hu','hy_AM','id','is','it','ja','ka','kk','ko','lt','lv','mk',
+                    'my','nl','no','pl','pt_BR','pt_PT','ro','ru','sd','si','sk','sl','sr_lat','sr','sv','th','tj','tr','uk','ur','vi','zh','zh_TW']" />
+        <set field="qPseudo" from="pseudoId ?: null" />
+        <set field="sPseudoId" from="qPseudo ? '%' + qPseudo + '%' : null" />
+
+        <set field="qName" from="categoryName ?: null" />
+        <set field="sCatName" from="qName ? '%' + qName + '%' : null" />
+
+        <entity-find entity-name="mantle.product.category.ProductCategory" list="categories" for-update="false" cache="true">
+            <econdition field-name="pseudoId" from="sPseudoId" ignore-if-empty="true" ignore-case="true" operator="like" />
+            <econdition field-name="categoryName" from="sCatName" ignore-if-empty="true" ignore-case="true" operator="like" />
+            <select-field field-name="productCategoryId,pseudoId,categoryName,description"/>
+            <order-by field-name="pseudoId"/>
+            <use-iterator/>
+        </entity-find>
+        <set field="pList" from="[]" />
+        <iterate list="categories" entry="cat">
+            <entity-find entity-name="moqui.basic.LocalizedEntityField" list="l10nList" cache="true" for-update="false">
+                <econdition field-name="entityName" value="mantle.product.category.ProductCategory" />
+                <econdition field-name="pkValue" from="cat.productCategoryId" />
+                <order-by field-name="locale"/>
+            </entity-find>
+            <script><![CDATA[
+                Map pMap = cat.getEtlValues()
+                HashMap pData = new HashMap()
+                pData.put('productCategoryId', pMap.get('productCategoryId'))
+                pData.put('pseudoId', pMap.get('pseudoId'))
+                pData.put('categoryName', pMap.get('categoryName'))
+                pData.put('description', pMap.get('description'))
+                if(qPseudo) pData.put('qPseudo', qPseudo)
+                if(qName) pData.put('qName', qName)
+                Map pLocal = new HashMap(pData)
+                pLocal.put('locale', '')
+                pList.add(pLocal)
+                pLocal = new HashMap(pData)
+                pLocal.put('locale', 'en')
+                pList.add(pLocal)
+                String curLocale = 'en'
+                l10nList.each {
+                    if(it.locale != currentLocale) {
+                        pLocal = new HashMap(pData)
+                        pLocal.put('locale', it.locale)
+                        pList.add(pLocal)
+                        currentLocale = it.locale
+                    }
+                    pLocal.put(it.fieldName, it.localized)
+                }
+            ]]></script>
+        </iterate>
+    </actions>
+    <widgets>
+        <form-list name="UpdateLocalizedProduct" list="pList"
+                   transition="saveL10nData" multi="false">
+            <field name="productCategoryId" hide="true"/>
+            <field name="qPseudo" hide="true" />
+            <field name="qName" hide="true" />
+            <field name="pseudoId">
+                <header-field show-order-by="false" title="ID"><text-find hide-options="true" size="12"/></header-field>
+                <default-field><display/></default-field>
+            </field>
+            <field name="locale">
+                <!--                <header-field title="Locale"><drop-down><list-options list="locales" /></drop-down></header-field>-->
+                <conditional-field condition="locale != ''">
+                    <display />
+                </conditional-field>
+                <conditional-field condition="locale == ''" >
+                    <drop-down><list-options list="locales" /></drop-down>
+                </conditional-field>
+            </field>
+            <field name="categoryName">
+                <header-field show-order-by="false"><text-find hide-options="true" size="33"/></header-field>
+                <default-field>
+                    <text-area rows="2" cols="30" />
+                </default-field>
+            </field>
+
+            <field name="description">
+                <default-field>
+                    <text-area rows="2" cols="50" />
+                </default-field>
+            </field>
+            <field name="actions">
+                <header-field title="Find"><submit/></header-field>
+                <conditional-field condition="locale == ''" title="Create">
+                    <submit />
+                </conditional-field>
+                <conditional-field condition="locale != ''" title="Update">
+                    <submit />
+                </conditional-field>
+            </field>
+            <field name="delete">
+                <conditional-field condition="locale != '' &amp;&amp; locale != 'en'" title="">
+                    <link text="Delete" url="deleteL10nData"
+                          confirmation="Are you sure want to delete ${locale} data for category ${pseudoId} ?">
+                        <parameter name="productCategoryId" />
+                        <parameter name="locale"/>
+                        <parameter name="qPseudo" />
+                        <parameter name="qName" />
+                    </link>
+                </conditional-field>
+            </field>
+        </form-list>
+    </widgets>
+</screen>
