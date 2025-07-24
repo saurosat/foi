@@ -10,11 +10,17 @@
     <screen-facade>
         <screen location="component://SimpleScreens/screen/SimpleScreens/Catalog/Product.xml">
             <subscreens-item name="L10n" menu-title="Localization" menu-index="2"
-                             location="component://foi/screen/gleecy/l10n/Products.xml" />
+                             location="component://foi/screen/gleecy/l10n/L10nProducts.xml" />
         </screen>
+<!--
         <screen location="component://SimpleScreens/screen/SimpleScreens/Catalog/Category.xml">
             <subscreens-item name="L10n" menu-title="Localization" menu-index="2"
                              location="component://foi/screen/gleecy/l10n/Categories.xml" />
+        </screen>
+-->
+        <screen location="component://SimpleScreens/screen/SimpleScreens/Catalog/Category.xml">
+            <subscreens-item name="L10nContent" menu-title="Localized content" menu-index="2"
+                             location="component://foi/screen/gleecy/l10n/L10nCategories.xml" />
         </screen>
     </screen-facade>
 
