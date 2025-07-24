@@ -1,14 +1,47 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <entities xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/entity-definition-3.xsd">
-    <view-entity entity-name="LocalizedEntityField" package="mantle.product">
-        <member-entity entity-alias="p" entity-name="mantle.product.Product" />
-        <member-entity entity-alias="en" entity-name="moqui.basic.LocalizedEntityField" join-optional="true" join-from-alias="p">
-            <key-map field-name="productId" related="pkValue" />
+    <view-entity entity-name="L10nCategory" package="mantle.product.category">
+        <member-entity entity-alias="c" entity-name="mantle.product.category.ProductCategory" />
+        <member-relationship entity-alias="ccn" join-from-alias="c" relationship="contents" join-optional="true">
             <entity-condition>
-                <econdition field-name="entityName" value="mantle.product.Product" />
-                <econdition field-name="fieldName" value="productName" />
-                <econdition field-name="locale" value="en" />
+                <econdition field-name="categoryContentTypeEnumId" value="PcctCategoryName" />
+                <date-filter />
             </entity-condition>
-        </member-entity>
+        </member-relationship>
+        <member-relationship entity-alias="ccd" join-from-alias="c" relationship="contents" join-optional="true">
+            <entity-condition>
+                <econdition field-name="categoryContentTypeEnumId" value="PcctDescription" />
+                <econdition field-name="locale" to-entity-alias="ccn" to-field-name="locale" />
+                <date-filter />
+            </entity-condition>
+        </member-relationship>
+        <alias-all entity-alias="c" />
+        <alias name="locale" entity-alias="ccn" field="locale" />
+        <alias name="nameL10n" entity-alias="ccn" field="description" />
+        <alias name="descL10n" entity-alias="ccd" field="description" />
+        <alias name="nameContentId" entity-alias="ccn" field="productCategoryContentId"/>
+        <alias name="descContentId" entity-alias="ccd" field="productCategoryContentId"/>
+    </view-entity>
+    <view-entity entity-name="L10nProduct" package="mantle.product">
+        <member-entity entity-alias="p" entity-name="mantle.product.Product" />
+        <member-relationship entity-alias="pcn" join-from-alias="p" relationship="contents" join-optional="true">
+            <entity-condition>
+                <econdition field-name="productContentTypeEnumId" value="PcntProductName" />
+                <date-filter />
+            </entity-condition>
+        </member-relationship>
+        <member-relationship entity-alias="pcd" join-from-alias="p" relationship="contents" join-optional="true">
+            <entity-condition>
+                <econdition field-name="productContentTypeEnumId" value="PcntDescription" />
+                <econdition field-name="locale" to-entity-alias="pcn" to-field-name="locale" />
+                <date-filter />
+            </entity-condition>
+        </member-relationship>
+        <alias-all entity-alias="p" />
+        <alias name="locale" entity-alias="pcn" field="locale" />
+        <alias name="nameL10n" entity-alias="pcn" field="description" />
+        <alias name="descL10n" entity-alias="pcd" field="description" />
+        <alias name="nameContentId" entity-alias="pcn" field="productContentId"/>
+        <alias name="descContentId" entity-alias="pcd" field="productContentId"/>
     </view-entity>
 </entities>

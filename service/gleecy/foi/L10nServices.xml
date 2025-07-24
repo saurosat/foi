@@ -2,33 +2,61 @@
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
     <service verb="delete" noun="ProductL10nData">
         <in-parameters>
+            <parameter name="nameContentId" />
+            <parameter name="descContentId" />
             <parameter name="productId" />
             <parameter name="locale" />
         </in-parameters>
         <actions>
-            <entity-delete-by-condition entity-name="moqui.basic.LocalizedEntityField">
-                <econdition field-name="entityName" value="mantle.product.Product" />
-                <econdition field-name="locale" from="locale" />
-                <econdition field-name="pkValue" from="productId" />
-            </entity-delete-by-condition>
+            <if condition="productContentId">
+                <then>
+                    <entity-delete-by-condition entity-name="mantle.product.ProductContent">
+                        <econditions combine="or">
+                            <econdition field-name="productContentId" from="nameContentId" ignore-if-empty="true" />
+                            <econdition field-name="productContentId" from="descContentId" ignore-if-empty="true" />
+                        </econditions>
+                    </entity-delete-by-condition>
+                </then>
+                <else>
+                    <entity-delete-by-condition entity-name="moqui.basic.LocalizedEntityField">
+                        <econdition field-name="entityName" value="mantle.product.Product" />
+                        <econdition field-name="locale" from="locale" />
+                        <econdition field-name="pkValue" from="productId" />
+                    </entity-delete-by-condition>
+                </else>
+            </if>
         </actions>
     </service>
     <service verb="delete" noun="CategoryL10nData">
         <in-parameters>
+            <parameter name="nameContentId" />
+            <parameter name="descContentId" />
             <parameter name="productCategoryId" />
             <parameter name="locale" />
         </in-parameters>
         <actions>
-            <entity-delete-by-condition entity-name="moqui.basic.LocalizedEntityField">
-                <econdition field-name="entityName" value="mantle.product.category.ProductCategory" />
-                <econdition field-name="locale" from="locale" />
-                <econdition field-name="pkValue" from="productCategoryId" />
-            </entity-delete-by-condition>
+            <if condition="nameContentId || descContentId">
+                <then>
+                    <entity-delete-by-condition entity-name="mantle.product.category.ProductCategoryContent">
+                        <econditions combine="or">
+                            <econdition field-name="productCategoryContentId" from="nameContentId" ignore-if-empty="true" />
+                            <econdition field-name="productCategoryContentId" from="descContentId" ignore-if-empty="true" />
+                        </econditions>
+                    </entity-delete-by-condition>
+                </then>
+                <else>
+                    <entity-delete-by-condition entity-name="moqui.basic.LocalizedEntityField">
+                        <econdition field-name="entityName" value="mantle.product.category.ProductCategory" />
+                        <econdition field-name="locale" from="locale" />
+                        <econdition field-name="pkValue" from="productCategoryId" />
+                    </entity-delete-by-condition>
+                </else>
+            </if>
         </actions>
     </service>
     <service verb="save" noun="LocalizedEntityField" >
         <in-parameters>
-            <auto-parameters />
+            <auto-parameters entity-name="moqui.basic.LocalizedEntityField" />
         </in-parameters>
         <actions>
             <entity-find-one entity-name="moqui.basic.LocalizedEntityField" value-field="locEntity" for-update="true" />
@@ -42,7 +70,6 @@
                     <entity-create value-field="locEntity"/>
                 </else>
             </if>
-
         </actions>
     </service>
     <service verb="save" noun="ProductL10nData">
@@ -51,51 +78,134 @@
             <parameter name="locale" />
             <parameter name="productName" />
             <parameter name="description" />
+            <parameter name="descContentId" />
+            <parameter name="nameContentId" />
         </in-parameters>
         <actions>
-            <entity-find-one entity-name="mantle.product.Product" value-field="product" for-update="true" />
-            <if condition="product">
-                <if condition="locale == 'en'" >
+            <if condition="!productId"><return type="success"/> </if>
+            <log level="info" message="save#ProductL10nData: nameContentId=${nameContentId}, descContentId=${descContentId}, productId=${productId}" />
+
+            <set field="dbLang" from="((org.moqui.impl.entity.EntityFacadeImpl) ec.getEntity()).getDatabaseLocale().getLanguage()" />
+            <set field="update" from="productId ? (!locale || locale == dbLang) : false" />
+            <set field="create" from="(locale ? locale != dbLang : false)" />
+            <set field="nameContentId" from="nameContentId ? nameContentId.trim() : null" />
+            <set field="descContentId" from="descContentId ? descContentId.trim() : null" />
+            <if condition="nameContentId">
+                <entity-find-one entity-name="mantle.product.ProductContent" value-field="nameContent" for-update="true">
+                    <field-map field-name="productContentId" from="nameContentId" />
+                </entity-find-one>
+                <if condition="!productName || productName.isBlank()" >
                     <then>
-                        <entity-set value-field="product" map="[productName:productName, description:description]"/>
-                        <entity-update value-field="product"/>
+                        <entity-delete value-field="nameContent"/>
                     </then>
                     <else>
-                        <if condition="description != product.description">
-                            <service-call name="gleecy.foi.L10nServices.save#LocalizedEntityField" disable-authz="true"
-                                          in-map="[entityName:'mantle.product.Product', locale:locale, pkValue:productId, fieldName:'description', localized:description]" />
-                        </if>
-                        <if condition="productName != product.productName">
-                            <service-call name="gleecy.foi.L10nServices.save#LocalizedEntityField" disable-authz="true"
-                                      in-map="[entityName:'mantle.product.Product', locale:locale, pkValue:productId, fieldName:'productName', localized:productName]" />
-                        </if>
+                        <entity-set value-field="nameContent" map="[description: productName]" />
+                        <entity-update value-field="nameContent"/>                        
                     </else>
+                </if>
+            </if>
+            <if condition="descContentId">
+                <entity-find-one entity-name="mantle.product.ProductContent" value-field="descContent" for-update="true">
+                    <field-map field-name="productContentId" from="descContentId" />
+                </entity-find-one>
+                <if condition="!description || description.isBlank()" >
+                    <then>
+                        <entity-delete value-field="descContent"/>
+                    </then>
+                    <else>
+                        <entity-set value-field="descContent" map="[description: description]" />
+                        <entity-update value-field="descContent"/>
+                    </else>
+                </if>
+            </if>
+            <if condition="update">
+                <entity-find-one entity-name="mantle.product.Product" value-field="product" for-update="true" />
+                <if condition="product">
+                    <entity-set value-field="product" map="[productName:productName, description:description]"/>
+                    <entity-update value-field="product"/>
+                </if>
+            </if>
+            <if condition="create">
+                <if condition="!nameContentId &amp;&amp;  productName &amp;&amp; !productName.isBlank()">
+                    <entity-make-value entity-name="mantle.product.ProductContent" value-field="content"
+                                       map="[productId:productId, locale:locale, description: productName, productContentTypeEnumId:'PcntProductName']" />
+                    <entity-sequenced-id-primary value-field="content"/>
+                    <entity-create value-field="content" />
+                </if>
+                <if condition="!descContentId &amp;&amp; description &amp;&amp; !description.isBlank()">
+                    <entity-make-value entity-name="mantle.product.ProductContent" value-field="content"
+                                       map="[productId:productId, locale:locale, description: description, productContentTypeEnumId:'PcntDescription']" />
+                    <entity-sequenced-id-primary value-field="content"/>
+                    <entity-create value-field="content" />
                 </if>
             </if>
         </actions>
     </service>
     <service verb="save" noun="CategoryL10nData">
         <in-parameters>
-            <parameter name="productCategoryId" />
+            <parameter name="productCategoryId"/>
             <parameter name="locale" />
             <parameter name="categoryName" />
             <parameter name="description" />
+            <parameter name="descContentId" />
+            <parameter name="nameContentId" />
         </in-parameters>
         <actions>
-            <if condition="locale == 'en'" >
-                <then>
-                    <entity-find-one entity-name="mantle.product.category.ProductCategory" value-field="category" for-update="true" />
-                    <if condition="category">
-                        <entity-set value-field="category" map="[categoryName:categoryName, description:description]"/>
-                        <entity-update value-field="category"/>
-                    </if>
-                </then>
-                <else>
-                    <service-call name="gleecy.foi.L10nServices.save#LocalizedEntityField" disable-authz="true"
-                                  in-map="[entityName:'mantle.product.category.ProductCategory', locale:locale, pkValue:productCategoryId, fieldName:'description', localized:description]" />
-                    <service-call name="gleecy.foi.L10nServices.save#LocalizedEntityField" disable-authz="true"
-                                  in-map="[entityName:'mantle.product.category.ProductCategory', locale:locale, pkValue:productCategoryId, fieldName:'categoryName', localized:categoryName]" />
-                </else>
+            <if condition="!productCategoryId"><return type="success"/> </if>
+            <log level="info" message="save#CategoryL10nData: nameContentId=${nameContentId}, descContentId=${descContentId}, productCategoryId=${productCategoryId}" />
+            <set field="dbLang" from="((org.moqui.impl.entity.EntityFacadeImpl) ec.getEntity()).getDatabaseLocale().getLanguage()" />
+            <set field="update" from="productCategoryId ? (!locale || locale == dbLang) : false" />
+            <set field="create" from="(locale ? locale != dbLang : false)" />
+            <set field="nameContentId" from="nameContentId ? nameContentId.trim() : null" />
+            <set field="descContentId" from="descContentId ? descContentId.trim() : null" />
+            <if condition="nameContentId">
+                <entity-find-one entity-name="mantle.product.category.ProductCategoryContent" value-field="nameContent" for-update="true">
+                    <field-map field-name="productCategoryContentId" from="nameContentId" />
+                </entity-find-one>
+                <if condition="!categoryName || categoryName.isBlank()" >
+                    <then>
+                        <entity-delete value-field="nameContent"/>
+                    </then>
+                    <else>
+                        <entity-set value-field="nameContent" map="[description: categoryName]" />
+                        <entity-update value-field="nameContent"/>
+                    </else>
+                </if>
+            </if>
+            <if condition="descContentId">
+                <entity-find-one entity-name="mantle.product.category.ProductCategoryContent" value-field="descContent" for-update="true">
+                    <field-map field-name="productCategoryContentId" from="descContentId" />
+                </entity-find-one>
+                <if condition="!description || description.isBlank()" >
+                    <then>
+                        <entity-delete value-field="descContent"/>
+                    </then>
+                    <else>
+                        <entity-set value-field="descContent" map="[description: description]" />
+                        <entity-update value-field="descContent"/>
+                    </else>
+                </if>
+            </if>
+            <if condition="update">
+                <entity-find-one entity-name="mantle.product.category.ProductCategory" value-field="category" for-update="true" />
+                <if condition="category">
+                    <entity-set value-field="category" map="[categoryName:categoryName, description:description]"/>
+                    <entity-update value-field="category"/>
+                </if>
+            </if>
+            <if condition="create">
+                <if condition="!nameContentId &amp;&amp; categoryName &amp;&amp; !categoryName.isBlank()">
+                    <entity-make-value entity-name="mantle.product.category.ProductCategoryContent" value-field="content"
+                                       map="[productCategoryId:productCategoryId, locale:locale, description: categoryName, categoryContentTypeEnumId:'PcctCategoryName']" />
+                    <entity-sequenced-id-primary value-field="content"/>
+                    <entity-create value-field="content" />
+                </if>
+                <if condition="!descContentId &amp;&amp; description &amp;&amp; !description.isBlank()">
+                    <entity-make-value entity-name="mantle.product.category.ProductCategoryContent" value-field="content"
+                                       map="[productCategoryId:productCategoryId, locale:locale, description: description, categoryContentTypeEnumId:'PcctDescription']" />
+                    <entity-sequenced-id-primary value-field="content"/>
+                    <entity-create value-field="content" />
+                </if>
             </if>
         </actions>
     </service>

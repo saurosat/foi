@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-3.xsd"
+        default-menu-title="Products' Localization" default-menu-index="2" default-menu-include="false">
+    <parameter name="qPseudo"/>
+    <parameter name="qName"/>
+    <parameter name="qDesc"/>
+    <parameter name="qLocale"/>
+
+    <transition name="saveL10nData">
+        <actions>
+            <if condition="productId">
+                <service-call name="gleecy.foi.L10nServices.save#ProductL10nData" in-map="context" />
+            </if>
+        </actions>
+        <default-response url="." parameter-map="['pseudoId':qPseudo, 'productName':qName, 'description':qDesc, 'locale': qLocale]"/>
+    </transition>
+
+    <actions>
+        <set field="locales" from="['en', 'vi', 'cn']" />
+        <set field="showNew" from="locale == 'Y'" />
+        <set field="qParams" from="['qPseudo':pseudoId,'qName':productName,'qDesc':description,'qLocale':showNew ? 'Y':'N']" />
+
+        <set field="qPseudo" from="pseudoId ? '%' + pseudoId + '%' : null" />
+        <set field="qName" from="productName ? '%' + productName + '%' : null"  />
+        <set field="qDesc" from="description ? '%' + description + '%' : null"  />
+        <log level="info" message="qPseudo = ${qPseudo ?: 'empty'}, qName=${qName}" />
+        <entity-find entity-name="mantle.product.L10nProduct" cache="true" list="records">
+            <econdition field-name="pseudoId" from="qPseudo" operator="like" ignore-if-empty="true" ignore-case="true" />
+            <econditions combine="or">
+                <econdition field-name="productName" from="qName" operator="like" ignore-if-empty="true" ignore-case="true" />
+                <econdition field-name="nameL10n" from="qName" operator="like" ignore-if-empty="true" ignore-case="true" />
+            </econditions>
+            <econditions combine="or">
+                <econdition field-name="description" from="qDesc" operator="like" ignore-if-empty="true" ignore-case="true" />
+                <econdition field-name="descL10n" from="qDesc" operator="like" ignore-if-empty="true" ignore-case="true" />
+            </econditions>
+            <econdition field-name="locale" from="locales" operator="in" or-null="true" />
+            <order-by field-name="pseudoId,locale"/>
+        </entity-find>
+        <log level="info" message="Found ${records.size()} records" />
+        <set field="l10nList" from="[]" type="List"/>
+        <script>
+            import org.moqui.context.ExecutionContext
+            import org.moqui.entity.EntityValue
+            import org.moqui.impl.entity.EntityFacadeImpl
+            String curId = null
+            String curPseudoId, curName, curDesc
+            String dbLang = ((EntityFacadeImpl) ec.getEntity()).getDatabaseLocale().getLanguage()
+            println("dbLang = " + dbLang)
+            int lastIdx = 0
+            Map lMap = [:]
+            for(EntityValue record: records) {
+                if(record.productId != curId) {
+                    locales.each {
+                        lMap[it] = ["productId": record.productId, "pseudoId": record.pseudoId, "locale": it, "productName":" ","description": " ", "nameContentId": " ", "descContentId": " "]
+                        if(it == dbLang) {
+                            lMap[it].productName = record.productName
+                            lMap[it].description = record.description
+                        }
+                        l10nList.add(lMap[it])
+                    }
+                    curId = record.productId
+                }
+
+                String locale = record.locale
+                if(locale == null || locale == dbLang) continue
+                Map l10n = lMap[locale]
+                l10n.productName = record.nameL10n
+                l10n.description = record.descL10n
+                l10n.nameContentId = record.nameContentId
+                l10n.descContentId = record.descContentId
+            }
+            if(!showNew) {
+                l10nList.retainAll {it.productName != " "}
+            }
+        </script>
+    </actions>
+    <widgets>
+        <form-list name="L10nProducts" list="l10nList"
+                   transition="saveL10nData" multi="false">
+            <hidden-parameters parameter-map="qParams" />
+            <field name="productId">
+                <default-field>
+                    <hidden />
+                </default-field>
+            </field>
+            <field name="nameContentId"><default-field>
+                <hidden />
+            </default-field></field>
+            <field name="descContentId"><default-field>
+                <hidden />
+            </default-field></field>
+            <field name="pseudoId">
+                <header-field show-order-by="false" title="ID">
+                    <text-find hide-options="true" size="8" default-value="${pseudoId ?: ''}"/>
+                </header-field>
+                <default-field><display/></default-field>
+            </field>
+            <field name="productName">
+                <header-field show-order-by="false" title="Name">
+                    <text-find hide-options="true" size="22" default-value="${productName ?: ''}"/>
+                </header-field>
+                <default-field>
+                    <text-area rows="2" cols="30" />
+                </default-field>
+            </field>
+            <field name="description">
+                <header-field show-order-by="false" title="Description">
+                    <text-find hide-options="true" size="22" default-value="${description ?: ''}"/>
+                </header-field>
+                <default-field>
+                    <text-area rows="2" cols="50" />
+                </default-field>
+            </field>
+            <field name="locale" align="center">
+                <header-field title="Locale">
+                    <check container-style=""><option key="Y" text="Show missing locales"/> </check>
+                </header-field>
+                <default-field><display/></default-field>
+            </field>
+            <field name="actions" align="right">
+                <header-field title=" " >
+                    <submit text="Find "/>
+                </header-field>
+                <default-field title="Save">
+                    <submit/>
+                </default-field>
+            </field>
+        </form-list>
+    </widgets>
+</screen>
